@@ -1,6 +1,6 @@
-# SpotLite 專案提案
+# SpotLite: 基於面向分析與個人化排序的旅遊景點周邊餐廳推薦系統
 
-**標題**: SpotLite: 基於面向分析與個人化排序的旅遊景點周邊餐廳推薦系統 (SpotLite: A System for Personalized, Aspect-Based Restaurant Recommendation Near Tourist Destinations)
+[![en](https://img.shields.io/badge/lang-English-blue)](https://github.com/wayneclub/SpotLite/blob/main/README.md)
 
 ---
 
