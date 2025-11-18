@@ -12,6 +12,7 @@ SpotLite Keyword Analyzer (English-only)
 import json
 import re
 import math
+import sys
 from pathlib import Path
 import numpy as np
 import pandas as pd
@@ -19,8 +20,20 @@ from sklearn.feature_extraction.text import TfidfVectorizer, ENGLISH_STOP_WORDS
 from sklearn.cluster import AgglomerativeClustering
 
 # ---------- Config ----------
-INPUT_PATH = Path("reviews.json")
-OUTPUT_DIR = Path("spotlite_outputs")
+# Read input file path from command line: python analyze_keywords.py <place_name>_reviews.json
+if len(sys.argv) < 2:
+    raise SystemExit("Usage: python analyze_keywords.py <reviews.json>")
+
+INPUT_PATH = Path(sys.argv[1])
+
+# Derive a per-place output folder from the input filename.
+# Example: 'Kato_reviews.json' -> place_name='Kato', outputs under 'outputs/Kato/'
+place_name = INPUT_PATH.stem
+if place_name.endswith("_reviews"):
+    place_name = place_name[:-8]  # strip trailing '_reviews'
+
+OUTPUT_ROOT = Path("outputs")
+OUTPUT_DIR = OUTPUT_ROOT / place_name
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 MAX_FEATURES = 1000
