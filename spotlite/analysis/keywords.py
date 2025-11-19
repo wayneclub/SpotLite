@@ -12,34 +12,34 @@ SpotLite Keyword Analyzer (English-only)
 import json
 import re
 import math
-import sys
+import logging
 from pathlib import Path
 import numpy as np
 import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer, ENGLISH_STOP_WORDS
 from sklearn.cluster import AgglomerativeClustering
 
-# ---------- Config ----------
-# Read input file path from command line: python analyze_keywords.py <place_name>_reviews.json
-if len(sys.argv) < 2:
-    raise SystemExit("Usage: python analyze_keywords.py <reviews.json>")
+from spotlite.config import get_config
 
-INPUT_PATH = Path(sys.argv[1])
 
-# Derive a per-place output folder from the input filename.
-# Example: 'Kato_reviews.json' -> place_name='Kato', outputs under 'outputs/Kato/'
-place_name = INPUT_PATH.stem
-if place_name.endswith("_reviews"):
-    place_name = place_name[:-8]  # strip trailing '_reviews'
+# ---------- Config via configs.json ----------
+CONFIG = get_config()
+KEYWORDS_CFG = CONFIG.get("keywords", {})
 
-OUTPUT_ROOT = Path("outputs")
-OUTPUT_DIR = OUTPUT_ROOT / place_name
-OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+OUTPUT_ROOT = Path(KEYWORDS_CFG.get("output_root", "outputs"))
+MAX_FEATURES = KEYWORDS_CFG.get("max_features", 1000)
+N_TOP = KEYWORDS_CFG.get("n_top", 50)
+# JSON cannot store tuples directly; expect a list like [1, 2]
+NGRAM_RANGE = tuple(KEYWORDS_CFG.get("ngram_range", [1, 2]))
+MIN_DOC_FREQ = KEYWORDS_CFG.get("min_doc_freq", 2)
 
-MAX_FEATURES = 1000
-N_TOP = 50
-NGRAM_RANGE = (1, 2)
-MIN_DOC_FREQ = 2
+# ---------- Logger initialization ----------
+logger = logging.getLogger(__name__)
+if not logger.handlers:
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(message)s"
+    )
 
 DOMAIN_STOP = {
     # Restaurant/Hotel generic words to reduce noise
@@ -101,11 +101,32 @@ def snippet(text: str, query: str, width: int = 120) -> str:
     return out
 
 
-def main():
-    if not INPUT_PATH.exists():
-        raise FileNotFoundError(f"{INPUT_PATH} not found.")
+def analyze_keywords(input_path: Path):
+    """
+    Run keyword analysis for the given reviews JSON file.
 
-    raw_texts = load_reviews_json(INPUT_PATH)
+    Parameters
+    ----------
+    input_path : Path or str
+        Path to a reviews JSON file (e.g. '<place_name>_reviews.json').
+
+    Returns
+    -------
+    Path
+        The output directory where result files are written.
+    """
+    input_path = Path(input_path)
+    if not input_path.exists():
+        raise FileNotFoundError(f"{input_path} not found.")
+
+    # Derive place name and per-place output directory
+    place_name = input_path.stem
+    if place_name.endswith("_reviews"):
+        place_name = place_name[:-8]  # strip trailing '_reviews'
+    output_dir = OUTPUT_ROOT / place_name
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    raw_texts = load_reviews_json(input_path)
     docs = [clean_en(t) for t in raw_texts if t.strip()]
     if not docs:
         raise ValueError("No valid texts after cleaning.")
@@ -172,15 +193,15 @@ def main():
         ["cluster", "keyword"]).reset_index(drop=True)
 
     # ---- Save all ----
-    top_df.to_csv(OUTPUT_DIR / "top_keywords.csv", index=False)
-    clusters_df.to_csv(OUTPUT_DIR / "keyword_clusters.csv", index=False)
-    examples_df.to_csv(OUTPUT_DIR / "keyword_examples.csv", index=False)
+    top_df.to_csv(output_dir / "top_keywords.csv", index=False)
+    clusters_df.to_csv(output_dir / "keyword_clusters.csv", index=False)
+    examples_df.to_csv(output_dir / "keyword_examples.csv", index=False)
 
     full_df = top_df.merge(examples_df, on="keyword", how="left").merge(
         clusters_df, on="keyword", how="left")
-    full_df.to_csv(OUTPUT_DIR / "keywords_full.csv", index=False)
+    full_df.to_csv(output_dir / "keywords_full.csv", index=False)
 
-    with open(OUTPUT_DIR / "SUMMARY.txt", "w", encoding="utf-8") as f:
+    with open(output_dir / "SUMMARY.txt", "w", encoding="utf-8") as f:
         f.write(f"Total reviews: {len(raw_texts)}\n")
         f.write(f"After cleaning: {len(docs)}\n")
         f.write(f"Vocabulary size: {len(terms)}\n")
@@ -188,8 +209,5 @@ def main():
         f.write(
             f"N-grams: {NGRAM_RANGE}, min_df={MIN_DOC_FREQ}, max_features={MAX_FEATURES}\n")
 
-    print("Saved to:", str(OUTPUT_DIR))
-
-
-if __name__ == "__main__":
-    main()
+    logger.info(f"Saved to: {output_dir}")
+    return output_dir

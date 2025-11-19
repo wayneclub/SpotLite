@@ -1,9 +1,7 @@
-import re
+
 import urllib.parse
 from selenium import webdriver
-from selenium.webdriver.common.by import By
 from selenium.webdriver.support.wait import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import WebDriverException
 
 # ========= 共用：建立英文介面的 Chrome =========

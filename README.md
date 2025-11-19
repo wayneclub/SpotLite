@@ -1,6 +1,17 @@
-# **SpotLite**: A System for Personalized, Aspect-Based Restaurant Recommendation Near Tourist Destinations
+# SpotLite
 
 [![zh](https://img.shields.io/badge/lang-中文-blue)](https://github.com/wayneclub/SpotLite/blob/main/README.zh-Hant.md)
+
+SpotLite is a system for personalized, aspect‑based restaurant recommendation powered by Google Maps data and advanced NLP.
+
+## Documentation
+- [Architecture](docs/ARCHITECTURE.md)
+- [Developer Guide](docs/DEVELOPER_GUIDE.md)
+- [Scraping Guide](docs/SCRAPING.md)
+- [NLP Pipeline](docs/NLP_PIPELINE.md)
+- [API / CLI](docs/API.md)
+- [CLI Guide](docs/CLI.md)
+- [Roadmap](docs/ROADMAP.md)
 
 ---
 
@@ -179,3 +190,39 @@ This project integrates NLP, search experience optimization, and quantitative ev
 - Reimers, N., & Gurevych, I. (2019). *Sentence-BERT: Sentence Embeddings using Siamese BERT-Networks*. EMNLP.
 - Raffel, C., et al. (2020). *Exploring the Limits of Transfer Learning with a Unified Text-to-Text Transformer*. JMLR.
 - Hu, M., & Liu, B. (2004). *Mining and Summarizing Customer Reviews*. KDD.
+
+
+# File: docs/ARCHITECTURE.md
+# SpotLite Architecture
+
+This document describes the system architecture, module structure, and data flow for SpotLite.
+
+## 1. High-Level Pipeline
+Google Maps Link → URL Expansion → Details + Reviews → Cleaning → NLP Pipeline → Summary → Output
+
+## 2. Project Structure
+```
+(keep empty sections; user will expand)
+```
+
+# File: docs/DEVELOPER_GUIDE.md
+# SpotLite Developer Guide
+
+This guide covers config loading, logging, module imports, and execution flow.
+
+# File: docs/SCRAPING.md
+# Google Maps Scraping Guide
+
+Details for Selenium-based scraping, short-link resolution, scrolling logic, and review extraction.
+
+# File: docs/NLP_PIPELINE.md
+# NLP Pipeline Documentation
+Covers: Aspect extraction, keyword clustering, sentiment analysis, AI summarization.
+
+# File: docs/API.md
+# CLI & API Reference
+Usage for: details, reviews, analyze, debug mode.
+
+# File: docs/ROADMAP.md
+# SpotLite Roadmap
+Future features and tasks.

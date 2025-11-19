@@ -4,6 +4,7 @@ import time
 import json
 from datetime import datetime, timedelta
 from pathlib import Path
+import logging
 
 import pandas as pd
 from bs4 import BeautifulSoup as Soup
@@ -12,7 +13,18 @@ from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import WebDriverException
 
-from maps_common import create_en_browser, ensure_hl_en, expand_maps_share_url
+from spotlite.maps.common import (
+    create_en_browser,
+    ensure_hl_en,
+    expand_maps_share_url,
+)
+
+from spotlite.config import get_config
+
+CONFIG = get_config()
+REVIEWS_CFG = CONFIG.get("reviews", {})
+
+logger = logging.getLogger(__name__)
 
 # ==============================
 # Constants / selectors
@@ -33,13 +45,15 @@ DATE_SELECTOR = '.rsqaWe, .section-review-publish-date'
 STRUCTURED_BLOCK_SELECTOR = 'div[jslog="127691"]'
 
 # Stop scrolling once we see "2 years ago" or older (e.g., 3 years ago)
-STOP_AT_YEARS_AGO = 2
+STOP_AT_YEARS_AGO = REVIEWS_CFG.get("stop_at_years_ago", 2)
 
 # ==============================
 # Browser helpers
 # ==============================
 
-OUTPUT_ROOT = Path("data")
+OUTPUT_ROOT = Path(REVIEWS_CFG.get("output_root", "data/reviews"))
+SAVE_JSON = REVIEWS_CFG.get("save_json", True)
+SAVE_CSV = REVIEWS_CFG.get("save_csv", True)
 
 
 def click_safely(browser, elem):
@@ -89,7 +103,8 @@ def open_reviews_tab(browser):
         click_safely(browser, reviews_tab)
         time.sleep(1.0)
     except Exception:
-        print("⚠️ Reviews tab not found; maybe already on Reviews or selector needs update")
+        logger.warning(
+            "⚠️ Reviews tab not found; maybe already on Reviews or selector needs update")
 
 
 def sort_reviews_newest(browser):
@@ -133,11 +148,13 @@ def sort_reviews_newest(browser):
             )
             target.click()
             time.sleep(1.0)
-            print("✅ Sorted reviews by newest.")
+            logger.info("✅ Sorted reviews by newest.")
         else:
-            print("⚠️ Could not find 'Newest' option in sort menu; using default order.")
+            logger.warning(
+                "⚠️ Could not find 'Newest' option in sort menu; using default order.")
     except Exception:
-        print("⚠️ Sort button or menu not found; proceeding without changing sort order.")
+        logger.warning(
+            "⚠️ Sort button or menu not found; proceeding without changing sort order.")
 
 
 def find_review_container(browser):
@@ -147,12 +164,13 @@ def find_review_container(browser):
             container = WebDriverWait(browser, 10).until(
                 EC.presence_of_element_located((By.CSS_SELECTOR, css))
             )
-            print(f"✅ Review container found via: {css}")
+            logger.info(f"✅ Review container found via: {css}")
             return container
         except Exception:
             continue
 
-    print("⚠️ Could not locate dedicated scroll container; will use window scrolling as fallback.")
+    logger.warning(
+        "⚠️ Could not locate dedicated scroll container; will use window scrolling as fallback.")
     return None
 
 
@@ -381,7 +399,7 @@ def should_stop_due_to_old_reviews(browser, years_threshold=STOP_AT_YEARS_AGO) -
             if "years ago" in txt:
                 m = re.search(r"(\d+)", txt)
                 if m and int(m.group(1)) >= years_threshold:
-                    print(
+                    logger.info(
                         f"⏹ Found old review with date '{txt}'; stop scrolling.")
                     return True
         except Exception:
@@ -395,6 +413,8 @@ def scroll_reviews_to_bottom(browser, container, max_rounds=600, pause=0.9):
     older than the configured years threshold.
     If container is None, scroll the window instead.
     """
+    scroll_cfg = REVIEWS_CFG.get("scroll", {})
+    stall_limit = scroll_cfg.get("stall_limit", 5)
     last_height = -1
     last_count = 0
     stall = 0
@@ -430,16 +450,18 @@ def scroll_reviews_to_bottom(browser, container, max_rounds=600, pause=0.9):
 
         # Stop early if we see "2 years ago" (or more) in any review
         if should_stop_due_to_old_reviews(browser, years_threshold=STOP_AT_YEARS_AGO):
-            print(f"🔽 Scroll round {i+1}: height={h}, reviews_loaded={count}")
+            logger.info(
+                f"🔽 Scroll round {i+1}: height={h}, reviews_loaded={count}")
             break
 
-        print(f"🔽 Scroll round {i+1}: height={h}, reviews_loaded={count}")
+        logger.info(
+            f"🔽 Scroll round {i+1}: height={h}, reviews_loaded={count}")
 
         # Stall detection: no growth in height or count
         if h == last_height and count == last_count:
             stall += 1
-            if stall >= 5:
-                print(
+            if stall >= stall_limit:
+                logger.info(
                     "⏹ No further growth in scroll height or review count; stop scrolling."
                 )
                 break
@@ -466,7 +488,11 @@ def scrape_reviews_for_url(raw_url: str):
         - Parse all visible reviews
         - Return (place_name, [reviews])
     """
-    browser = create_en_browser(headless=False, window_size="1280,900")
+    browser_cfg = CONFIG.get("browser", {})
+    browser = create_en_browser(
+        headless=browser_cfg.get("headless", False),
+        window_size=browser_cfg.get("window_size", "1280,900")
+    )
 
     try:
         # Normalize / expand share URL
@@ -490,15 +516,21 @@ def scrape_reviews_for_url(raw_url: str):
         review_container = find_review_container(browser)
         container = review_container if review_container is not None else None
 
-        print("⏬ Scrolling reviews to bottom (auto 'More' expansion)...")
-        scroll_reviews_to_bottom(browser, container, max_rounds=120, pause=0.8)
+        logger.info("⏬ Scrolling reviews to bottom (auto 'More' expansion)...")
+        scroll_cfg = REVIEWS_CFG.get("scroll", {})
+        scroll_reviews_to_bottom(
+            browser,
+            container,
+            max_rounds=scroll_cfg.get("max_rounds", 120),
+            pause=scroll_cfg.get("pause_seconds", 0.8)
+        )
 
         # Final pass: expand any remaining "More" buttons after scrolling
         expand_visible_more_buttons(browser)
 
         # After scrolling and final expansion, collect ALL visible review nodes once
         nodes = browser.find_elements(By.CSS_SELECTOR, REVIEW_NODE_SELECTOR)
-        print(f"📥 Found {len(nodes)} review nodes after scrolling.")
+        logger.info(f"📥 Found {len(nodes)} review nodes after scrolling.")
 
         parsed = []
         seen_ids = set()
@@ -510,7 +542,7 @@ def scrape_reviews_for_url(raw_url: str):
             parsed.append(d)
             seen_ids.add(rid)
 
-        print(
+        logger.info(
             f"✅ Parsed {len(parsed)} unique reviews from the current page view.")
 
         # Extract place name for filenames
@@ -535,33 +567,25 @@ def scrape_reviews_for_url(raw_url: str):
 def save_reviews(place_name: str, reviews: list[dict]):
     """Save reviews to JSON and CSV using a sanitized place name as prefix."""
     safe_name = re.sub(r'[\\/*?:"<>|]', "_", place_name) or "place"
+    OUTPUT_ROOT.mkdir(parents=True, exist_ok=True)
 
     # JSON
-    json_filename = OUTPUT_ROOT / f"{safe_name}_reviews.json"
-    with open(json_filename, "w", encoding="utf-8") as f:
-        json.dump(reviews, f, ensure_ascii=False, indent=2)
-    print(f"💾 Saved reviews to {json_filename}")
+    if SAVE_JSON:
+        json_filename = OUTPUT_ROOT / f"{safe_name}_reviews.json"
+        with open(json_filename, "w", encoding="utf-8") as f:
+            json.dump(reviews, f, ensure_ascii=False, indent=2)
+        logger.info(f"💾 Saved reviews to {json_filename}")
+    else:
+        logger.info("🔕 JSON saving disabled in config.")
 
     # CSV
-    try:
-        df = pd.DataFrame(reviews)
-        csv_filename = OUTPUT_ROOT / f"{safe_name}_reviews.csv"
-        df.to_csv(csv_filename, index=False)
-        print(f"💾 Saved reviews CSV to {csv_filename}")
-    except Exception as e:
-        print(f"⚠️ Failed to save CSV: {e}")
-
-
-def main():
-    # -------- Target URL (CLI: python maps_reivews.py <url>) --------
-    if len(sys.argv) > 1:
-        raw_url = sys.argv[1]
+    if SAVE_CSV:
+        try:
+            df = pd.DataFrame(reviews)
+            csv_filename = OUTPUT_ROOT / f"{safe_name}_reviews.csv"
+            df.to_csv(csv_filename, index=False)
+            logger.info(f"💾 Saved reviews CSV to {csv_filename}")
+        except Exception as e:
+            logger.error(f"⚠️ Failed to save CSV: {e}")
     else:
-        raw_url = "https://maps.app.goo.gl/qXabhrRhiFsKfE3k8"  # fallback default
-
-    place_name, reviews = scrape_reviews_for_url(raw_url)
-    save_reviews(place_name, reviews)
-
-
-if __name__ == "__main__":
-    main()
+        logger.info("🔕 CSV saving disabled in config.")
