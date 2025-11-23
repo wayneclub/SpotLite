@@ -72,11 +72,62 @@ def _get_domain_paths(domain: str) -> Dict[str, Path]:
 STOPWORDS: set[str] = set(ENGLISH_STOP_WORDS)
 PROTECTED_PHRASES: Dict[str, str] = {}
 
+
 # RAW：保留原始 aspect_seeds.json 結構（含 seeds_pos / seeds_neg），給 phrase sentiment 用
 ASPECT_SEEDS_RAW: Dict[str, Dict[str, List[str]]] = {}
 
 # 合併版：pos+neg 合併後的種子，用來建立每個 aspect 的語意中心（assign_aspect 用）
 ASPECT_SEEDS: Dict[str, List[str]] = {}
+
+# 一些在餐廳情境下太泛用、通常不想當作 target 的 generic 名詞
+GENERIC_NOUNS: set[str] = {
+    "food",
+    "meal",
+    "meals",
+    "dish",
+    "dishes",
+    "plate",
+    "plates",
+    "stuff",
+    "thing",
+    "things",
+}
+
+# 全域 opinion hints：補強 phrase_sentiment，避免過度依賴星等
+GLOBAL_POS_SEEDS: List[str] = [
+    "amazing",
+    "excellent",
+    "great",
+    "awesome",
+    "fantastic",
+    "worth",
+    "worth it",
+    "worth the wait",
+    "worth_wait",
+    "delicious",
+    "tasty",
+    "fresh",
+    "perfect",
+]
+
+GLOBAL_NEG_SEEDS: List[str] = [
+    "terrible",
+    "awful",
+    "horrible",
+    "bad",
+    "bland",
+    "overcooked",
+    "cold",
+    "soggy",
+    "greasy",
+    "slow",
+    "rude",
+    "long wait",
+    "overpriced",
+    "expensive",
+    "noisy",
+    "crowded",
+]
 
 
 def init_domain(domain: Optional[str] = None) -> None:
@@ -324,8 +375,10 @@ def phrase_sentiment(phrase: str, aspect: str, threshold: float = 0.1) -> Option
         return None
 
     seeds_obj = ASPECT_SEEDS_RAW.get(aspect, {})
-    pos_seeds = seeds_obj.get("seeds_pos", []) or []
-    neg_seeds = seeds_obj.get("seeds_neg", []) or []
+    pos_seeds = list({str(s) for s in (seeds_obj.get(
+        "seeds_pos", []) or [])} | set(GLOBAL_POS_SEEDS))
+    neg_seeds = list({str(s) for s in (seeds_obj.get(
+        "seeds_neg", []) or [])} | set(GLOBAL_NEG_SEEDS))
 
     if not pos_seeds and not neg_seeds:
         return None
@@ -393,7 +446,12 @@ def extract_adj_noun_phrases(text: str) -> List[str]:
         if t1.pos_ == "ADJ" and t2.pos_ in {"NOUN", "PROPN"}:
             adj = t1.lemma_.lower()
             noun = t2.lemma_.lower()
-            if adj not in STOPWORDS and noun not in STOPWORDS:
+            # 過濾過於泛用的名詞（例如 food/meal/dish），但會保留 protected_phrases 產生的複合詞
+            if (
+                adj not in STOPWORDS
+                and noun not in STOPWORDS
+                and noun not in GENERIC_NOUNS
+            ):
                 phrases.append(f"{adj}_{noun}")
 
     # Pattern 2: NOUN + 'be' + ADJ
@@ -402,7 +460,11 @@ def extract_adj_noun_phrases(text: str) -> List[str]:
         if t1.pos_ in {"NOUN", "PROPN"} and t2.lemma_ == "be" and t3.pos_ == "ADJ":
             noun = t1.lemma_.lower()
             adj = t3.lemma_.lower()
-            if adj not in STOPWORDS and noun not in STOPWORDS:
+            if (
+                adj not in STOPWORDS
+                and noun not in STOPWORDS
+                and noun not in GENERIC_NOUNS
+            ):
                 phrases.append(f"{adj}_{noun}")
 
     return phrases
@@ -539,16 +601,31 @@ def analyze_aspect_phrases(input_path: str | Path, domain: Optional[str] = None)
     rows_tfidf: List[Dict] = []
 
     for (aspect, sentiment), docs in grouped_docs.items():
-        if len(docs) < 2:
+        # 先過濾掉空字串 / 全空白的文件
+        docs_clean = [d for d in docs if isinstance(d, str) and d.strip()]
+        if len(docs_clean) < 2:
             # 資料太少，跳過
+            logger.debug(
+                f"Skip TF-IDF for aspect={aspect}, sentiment={sentiment}: not enough non-empty docs ({len(docs_clean)})"
+            )
             continue
 
         vec = TfidfVectorizer(
-            ngram_range=(1, 1),   # phrase 已經是單一 token
-            min_df=2,             # phrase 至少出現在 2 則 review
+            ngram_range=(1, 1),   # phrase 已經是單一 token（例如 'fresh_fish'）
+            min_df=1,             # phrase 至少出現在 1 則 review
             stop_words=None,
+            token_pattern=r"(?u)\b\w+\b",  # 允許含底線的 token
         )
-        X = vec.fit_transform(docs)
+
+        try:
+            X = vec.fit_transform(docs_clean)
+        except ValueError as e:
+            # 例如：After pruning, no terms remain. Try a lower min_df or a higher max_df.
+            logger.warning(
+                f"Skipping TF-IDF for aspect={aspect}, sentiment={sentiment} due to error: {e}"
+            )
+            continue
+
         terms = vec.get_feature_names_out()
         scores = np.asarray(X.sum(axis=0)).ravel()
 
