@@ -1,0 +1,17 @@
+{
+  "paths": {
+    "google_map_reviews_output_root": "data/google_map/reviews",
+    "google_map_details_output_root": "data/google_map/details",
+    "keywords_output_root": "outputs",
+    "logs_root": "logs"
+  },
+
+  "logging": {
+    "level": "INFO",
+    "save_to_file": true,
+    "file_path": "logs/app.log",
+    "file_max_MB": 5,
+    "file_backup_count": 3,
+    "console": true
+  }
+}

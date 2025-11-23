@@ -3,11 +3,11 @@ import logging
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
-from spotlite.config import get_config
+from spotlite.config.config import load_config
 
 
 def setup_logging(force_debug=False):
-    logging_cfg = get_config().get("logging", {}).copy()
+    logging_cfg = load_config("configs.json").get("logging", {}).copy()
 
     # --debug mode overrides config
     if force_debug:

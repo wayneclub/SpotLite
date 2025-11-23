@@ -1,0 +1,29 @@
+{
+  "taste": {
+    "seeds_pos": [
+      "delicious",
+      "tasty",
+      "flavorful",
+      "fresh",
+      "rich broth",
+      "tender meat"
+    ],
+    "seeds_neg": ["bland", "too salty", "oily", "overcooked", "stale"]
+  },
+  "service": {
+    "seeds_pos": ["friendly staff", "attentive", "polite", "helpful"],
+    "seeds_neg": ["rude", "slow service", "ignored", "unprofessional"]
+  },
+  "environment": {
+    "seeds_pos": ["cozy", "quiet", "nice atmosphere", "good view"],
+    "seeds_neg": ["noisy", "crowded", "dirty", "smelly"]
+  },
+  "waiting_time": {
+    "seeds_pos": ["quick service", "no wait"],
+    "seeds_neg": ["long wait", "waited 40 minutes", "slow"]
+  },
+  "price": {
+    "seeds_pos": ["cheap", "affordable", "good value", "worth the price"],
+    "seeds_neg": ["expensive", "overpriced", "not worth it"]
+  }
+}

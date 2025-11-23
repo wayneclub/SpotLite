@@ -19,14 +19,19 @@ import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer, ENGLISH_STOP_WORDS
 from sklearn.cluster import AgglomerativeClustering
 
-from spotlite.config import get_config
+from spotlite.config.config import load_config
 
 
 # ---------- Config via configs.json ----------
-CONFIG = get_config()
-KEYWORDS_CFG = CONFIG.get("keywords", {})
+# Load separate configs
+GENERAL_CFG = load_config("configs.json")
+KEYWORDS_CFG = load_config("keywords.json")
 
-OUTPUT_ROOT = Path(KEYWORDS_CFG.get("output_root", "outputs"))
+# Output path comes from configs.json paths block
+PATH_CFG = GENERAL_CFG.get("paths", {})
+OUTPUT_ROOT = Path(PATH_CFG.get("keywords_output_root", "outputs"))
+
+# Keyword extraction settings
 MAX_FEATURES = KEYWORDS_CFG.get("max_features", 1000)
 N_TOP = KEYWORDS_CFG.get("n_top", 50)
 # JSON cannot store tuples directly; expect a list like [1, 2]

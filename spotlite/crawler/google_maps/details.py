@@ -5,20 +5,82 @@ import logging
 import os
 import re
 import json
+import urllib
 import requests
 
-from spotlite.config import get_config
+from spotlite.config.config import load_config
+from spotlite.crawler.google_maps.common import expand_maps_share_url
 
-# Global configuration: load from configs.json / configs.example.json
-CONFIG = get_config()
-GOOGLE_CFG = CONFIG.get("google_maps", {})
-DEFAULT_TIMEOUT = GOOGLE_CFG.get("timeout_seconds", 20)
+API_CFG = load_config("api.json")
+CRAWLER_CFG = load_config("crawler.json")
+GENERAL_CFG = load_config("configs.json")
 
-DETAILS_CFG = CONFIG.get("details", {})
-DETAILS_OUTPUT_ROOT = DETAILS_CFG.get("output_root", "data/details")
-DETAILS_SAVE_JSON = DETAILS_CFG.get("save_json", True)
+GM_API = API_CFG["google_maps"]["endpoints"]
+DETAILS_CFG = GM_API["details"]
+
+DEFAULT_TIMEOUT = DETAILS_CFG.get("timeout_seconds", 20)
+DETAILS_FIELDS = DETAILS_CFG.get("fields", "all")
+DETAILS_URL = DETAILS_CFG.get("url")
+
+PATH_CFG = GENERAL_CFG.get("paths", {})
+DETAILS_OUTPUT_ROOT = PATH_CFG.get(
+    "google_map_details_output_root", "data/google_map/details")
+
+CRAWLER_DETAILS_CFG = CRAWLER_CFG.get("providers", {}).get(
+    "google_maps", {}).get("details", {})
+DETAILS_SAVE_JSON = CRAWLER_DETAILS_CFG.get("save_json", True)
 
 logger = logging.getLogger(__name__)
+
+
+def get_place_id(api_key: str, url: str):
+    """Get place_id from Google Maps URL.
+
+    Strategy:
+    1. If query_place_id is in URL query, return it directly.
+    2. Otherwise, extract place name (text_query) and latlng from URL, then call find_place_id().
+    """
+    expanded = expand_maps_share_url(url)
+    parsed = urllib.parse.urlparse(expanded)
+    query_params = urllib.parse.parse_qs(parsed.query)
+
+    # 1) URL 本身就帶有 place_id 類資訊
+    if "query_place_id" in query_params:
+        return query_params["query_place_id"][0]
+
+    # 有些 URL 可能用 q=place_id:XXX 或 q=店名
+    text_query = None
+    if "q" in query_params:
+        raw_q = query_params["q"][0]
+        if raw_q.startswith("place_id:"):
+            return raw_q.replace("place_id:", "")
+        else:
+            text_query = urllib.parse.unquote_plus(raw_q)
+
+    # 2) 從 /maps/place/XXX 路徑中抓店名作為 text_query
+    if text_query is None and "/maps/place/" in parsed.path:
+        name_part = parsed.path.split("/maps/place/")[-1].split("/")[0]
+        text_query = urllib.parse.unquote_plus(name_part)
+
+    # 3) 從 path 中取得經緯度 @lat,lng,...
+    latlng = None
+    m = re.search(r"@(-?\d+\.\d+),(-?\d+\.\d+)", parsed.path)
+    if m:
+        latlng = f"{m.group(1)},{m.group(2)}"
+
+    # 若完全拿不到 text_query，只能放棄
+    if not text_query:
+        logger.error(f"❌ 無法從 URL 解析出可用的店名/text_query: {expanded}")
+        return None
+
+    # 4) 使用店名 + (可選) 經緯度呼叫 find_place_id
+    place_id = find_place_id(api_key, text_query, latlng=latlng)
+    if place_id:
+        return place_id
+
+    logger.error(
+        f"❌ 使用 Find Place/Text Search 仍無法找到 place_id，text_query={text_query}, latlng={latlng}")
+    return None
 
 
 def _debug_print_api(name: str, payload: dict):
@@ -38,7 +100,7 @@ def _debug_print_api(name: str, payload: dict):
 
 
 def find_place_id(api_key, text_query, latlng=None):
-    url = "https://maps.googleapis.com/maps/api/place/findplacefromtext/json"
+    url = GM_API["find_place"]["url"]
     params = {
         "key": api_key,
         "input": text_query,
@@ -74,7 +136,7 @@ def find_place_id(api_key, text_query, latlng=None):
 
 
 def text_search_place_id(api_key, query, latlng=None, radius=2000):
-    url = "https://maps.googleapis.com/maps/api/place/textsearch/json"
+    url = GM_API["text_search"]["url"]
     params = {"key": api_key, "query": query}
     if latlng:
         lat, lng = latlng.split(",")
@@ -89,7 +151,7 @@ def text_search_place_id(api_key, query, latlng=None, radius=2000):
 
 
 def nearby_search_place_id(api_key, keyword, latlng, radius=2000):
-    url = "https://maps.googleapis.com/maps/api/place/nearbysearch/json"
+    url = GM_API["nearby_search"]["url"]
     params = {"key": api_key, "keyword": keyword,
               "location": latlng, "radius": radius}
     resp = requests.get(url, params=params, timeout=DEFAULT_TIMEOUT).json()
@@ -102,8 +164,8 @@ def nearby_search_place_id(api_key, keyword, latlng, radius=2000):
 
 
 def get_place_details(api_key, place_id):
-    url = "https://maps.googleapis.com/maps/api/place/details/json"
-    fields = GOOGLE_CFG.get("details_fields", "all")
+    url = DETAILS_URL
+    fields = DETAILS_FIELDS
     params = {
         "place_id": place_id,
         "key": api_key,
@@ -112,39 +174,6 @@ def get_place_details(api_key, place_id):
         "reviews_sort": "newest",
     }
     return requests.get(url, params=params, timeout=DEFAULT_TIMEOUT).json()
-
-# Output results
-
-
-def display_details(result):
-    if result.get("status") != "OK":
-        logger.error(
-            f"❌ API Error: {result.get('status')} {result.get('error_message')}")
-        return
-
-    r = result["result"]
-    logger.info("✅ Business Information:")
-    logger.info(f"🏷 Name: {r.get('name')}")
-    logger.info(f"📍 Address: {r.get('formatted_address')}")
-    logger.info(f"📞 Phone: {r.get('formatted_phone_number')}")
-    logger.info(f"⭐ Rating: {r.get('rating')} / {r.get('user_ratings_total')}")
-    logger.info(f"🌐 Website: {r.get('website')}")
-    logger.info(f"🗺 Google Maps: {r.get('url')}")
-
-    logger.info("🕒 Opening Hours:")
-    weekday_text = (r.get("opening_hours") or {}).get("weekday_text")
-    if weekday_text:
-        for line in weekday_text:
-            logger.info(f"  - {line}")
-    else:
-        logger.info("  (Not provided)")
-
-    logger.info("📝 Latest Reviews (up to 5):")
-    for review in r.get("reviews", []):
-        logger.info(f"Author: {review.get('author_name')}")
-        logger.info(f"Rating: {review.get('rating')}")
-        logger.info(f"Time: {review.get('relative_time_description')}")
-        logger.info(f"Content: {review.get('text')[:200]} ...")
 
 
 def save_details(details, place_id):

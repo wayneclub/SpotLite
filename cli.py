@@ -2,15 +2,14 @@
 import argparse
 import logging
 
-from spotlite.config import get_config
-from spotlite.logging_config import setup_logging
-from spotlite.maps.common import extract_place_info
-from spotlite.maps.reviews import scrape_reviews_for_url, save_reviews
-from spotlite.maps.details import get_place_details, save_details
+from spotlite.config.config import load_config
+from spotlite.config.logging_config import setup_logging
+from spotlite.crawler.google_maps.reviews import scrape_reviews_for_url, save_reviews
+from spotlite.crawler.google_maps.details import get_place_details, get_place_id, save_details
 from spotlite.analysis.keywords import analyze_keywords
 
 
-CONFIG = get_config()
+API_KEYS = load_config("api_keys.json")
 logger = logging.getLogger(__name__)
 
 
@@ -24,15 +23,13 @@ def cmd_reviews(args):
 
 def cmd_details(args):
     url = args.url
-    google_cfg = CONFIG.get("google_maps", {})
+    google_cfg = API_KEYS.get("google_maps", {})
     api_key = google_cfg.get("api_key")
     if not api_key:
-        logger.error(
-            "❌ google_maps.api_key not set in configs.json/configs.example.json")
+        logger.error("❌ google_maps.api_key not set in configs/api_keys.json")
         return
 
-    info = extract_place_info(url)
-    place_id = info.get("place_id")
+    place_id = get_place_id(api_key, url)
     if not place_id:
         logger.error("❌ Could not extract place_id from URL")
         return
@@ -84,9 +81,16 @@ def build_parser():
 
 def main():
     parser = build_parser()
-    args = parser.parse_args()
+    try:
+        args = parser.parse_intermixed_args()
+    except Exception:
+        args = parser.parse_args()
 
     setup_logging(force_debug=args.debug)
+    if args.debug:
+        logger.setLevel(logging.DEBUG)
+        logging.getLogger().setLevel(logging.DEBUG)
+        logger.debug("Debug logging enabled via -d flag")
 
     # Dispatch to the selected subcommand
     args.func(args)

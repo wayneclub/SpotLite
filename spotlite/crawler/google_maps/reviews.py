@@ -1,4 +1,4 @@
-import sys
+
 import re
 import time
 import json
@@ -13,16 +13,23 @@ from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import WebDriverException
 
-from spotlite.maps.common import (
+from spotlite.crawler.google_maps.common import (
     create_en_browser,
     ensure_hl_en,
     expand_maps_share_url,
 )
 
-from spotlite.config import get_config
+from spotlite.config.config import load_config
 
-CONFIG = get_config()
-REVIEWS_CFG = CONFIG.get("reviews", {})
+CRAWLER_CFG = load_config("crawler.json")
+GENERAL_CFG = load_config("configs.json")
+
+REVIEWS_CFG = CRAWLER_CFG.get("providers", {}).get(
+    "google_maps", {}).get("reviews", {})
+SELENIUM_CFG = CRAWLER_CFG.get("selenium", {})
+BROWSER_CFG = SELENIUM_CFG.get("browser", {})
+
+PATH_CFG = GENERAL_CFG.get("paths", {})
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +58,8 @@ STOP_AT_YEARS_AGO = REVIEWS_CFG.get("stop_at_years_ago", 2)
 # Browser helpers
 # ==============================
 
-OUTPUT_ROOT = Path(REVIEWS_CFG.get("output_root", "data/reviews"))
+OUTPUT_ROOT = Path(PATH_CFG.get(
+    "google_map_reviews_output_root", "data/google_map/reviews"))
 SAVE_JSON = REVIEWS_CFG.get("save_json", True)
 SAVE_CSV = REVIEWS_CFG.get("save_csv", True)
 
@@ -488,11 +496,7 @@ def scrape_reviews_for_url(raw_url: str):
         - Parse all visible reviews
         - Return (place_name, [reviews])
     """
-    browser_cfg = CONFIG.get("browser", {})
-    browser = create_en_browser(
-        headless=browser_cfg.get("headless", False),
-        window_size=browser_cfg.get("window_size", "1280,900")
-    )
+    browser = create_en_browser()
 
     try:
         # Normalize / expand share URL

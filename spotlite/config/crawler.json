@@ -1,0 +1,34 @@
+{
+  "selenium": {
+    "browser": {
+      "headless": false,
+      "window_size": "1280,900",
+      "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
+      "accept_language": "en-US,en;q=0.9"
+    },
+    "url_handling": {
+      "resolve_short_links": true,
+      "selenium_timeout_seconds": 15
+    }
+  },
+
+  "providers": {
+    "google_maps": {
+      "reviews": {
+        "stop_at_years_ago": 2,
+        "scroll": {
+          "max_rounds": 120,
+          "pause_seconds": 0.8,
+          "stall_limit": 5
+        },
+        "save_json": true,
+        "save_csv": true
+      },
+
+      "details": {
+        "save_json": true
+      }
+    }
+  },
+  "yelp": {}
+}

@@ -1,0 +1,39 @@
+{
+  "google_maps": {
+    "endpoints": {
+      "details": {
+        "url": "https://maps.googleapis.com/maps/api/place/details/json",
+        "fields": "all",
+        "timeout_seconds": 20
+      },
+      "text_search": {
+        "url": "https://maps.googleapis.com/maps/api/place/textsearch/json",
+        "default_radius": 2000,
+        "timeout_seconds": 20
+      },
+      "nearby_search": {
+        "url": "https://maps.googleapis.com/maps/api/place/nearbysearch/json",
+        "default_radius": 2000,
+        "timeout_seconds": 20
+      },
+      "find_place": {
+        "url": "https://maps.googleapis.com/maps/api/place/findplacefromtext/json",
+        "default_inputtype": "textquery",
+        "timeout_seconds": 20
+      }
+    }
+  },
+
+  "yelp": {
+    "endpoints": {
+      "business": {
+        "url": "https://api.yelp.com/v3/businesses/{id}",
+        "timeout_seconds": 20
+      },
+      "reviews": {
+        "url": "https://api.yelp.com/v3/businesses/{id}/reviews",
+        "timeout_seconds": 20
+      }
+    }
+  }
+}

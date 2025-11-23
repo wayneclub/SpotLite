@@ -1,0 +1,9 @@
+{
+  "google_maps": {
+    "api_key": "YOUR_GOOGLE_MAPS_API_KEY"
+  },
+
+  "yelp": {
+    "api_key": "YOUR_YELP_API_KEY"
+  }
+}
