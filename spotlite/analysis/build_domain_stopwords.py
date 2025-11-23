@@ -10,9 +10,7 @@ from typing import Dict, List, Tuple
 
 import numpy as np
 from sentence_transformers import SentenceTransformer
-
-# 從你現有 project 拿這兩個（已經寫好的）
-from spotlite.analysis.keywords import clean_en, load_reviews_json
+from spotlite.analysis.utils_text import clean_en, load_reviews_json
 
 logger = logging.getLogger(__name__)
 if not logger.handlers:

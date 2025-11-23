@@ -1,7 +1,4 @@
 from typing import Optional
-import urllib.parse
-import re
-import requests
 from selenium import webdriver
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.common.exceptions import WebDriverException

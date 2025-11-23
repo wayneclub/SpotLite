@@ -1,0 +1,15 @@
+{
+  "protected_phrases": {
+    "kids meal": "kids_meal",
+    "happy meal": "happy_meal",
+    "set meal": "set_meal",
+    "comfort food": "comfort_food",
+    "sea food": "seafood",
+    "worth the price": "worth_price",
+    "value for money": "value_money",
+    "reasonable price": "reasonable_price",
+    "no wait": "no_wait",
+    "date night": "date_night",
+    "family dinner": "family_dinner"
+  }
+}

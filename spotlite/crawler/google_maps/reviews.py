@@ -13,7 +13,7 @@ from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import WebDriverException
 
-from spotlite.crawler.google_maps.common import (
+from spotlite.crawler.google_maps.browser_utils import (
     create_en_browser,
     ensure_hl_en,
     expand_maps_share_url,

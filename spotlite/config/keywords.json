@@ -1,11 +1,19 @@
 {
-  "max_features": 1000,
-  "n_top": 50,
-  "ngram_range": [1, 2],
-  "min_doc_freq": 2,
+  "default": {
+    "max_features": 1000,
+    "n_top": 50,
+    "ngram_range": [1, 2],
+    "min_doc_freq": 2
+  },
 
-  "stopwords": {
-    "enable_builtin": true,
-    "domain_stopwords_file": "domain_stopwords.json"
+  "domains": {
+    "restaurant": {
+      "stopwords": {
+        "enable_builtin": true,
+        "domain_stopwords_file": "restaurant/domain_stopwords.json"
+      },
+      "protected_phrases_file": "restaurant/protected_phrases.json",
+      "aspect_seeds_file": "restaurant/aspect_seeds.json"
+    }
   }
 }

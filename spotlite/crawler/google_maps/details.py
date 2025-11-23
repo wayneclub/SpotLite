@@ -9,7 +9,7 @@ import urllib
 import requests
 
 from spotlite.config.config import load_config
-from spotlite.crawler.google_maps.common import expand_maps_share_url
+from spotlite.crawler.google_maps.browser_utils import expand_maps_share_url
 
 API_CFG = load_config("api.json")
 CRAWLER_CFG = load_config("crawler.json")

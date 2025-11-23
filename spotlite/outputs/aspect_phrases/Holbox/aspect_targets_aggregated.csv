@@ -1,0 +1,52 @@
+aspect,sentiment,target_noun,total_mentions,top_adjectives
+environment,neg,noise,187,moderate(187)
+environment,neg,group,3,big(3)
+environment,neg,seating,3,open(3)
+environment,pos,easy,37,quiet(37)
+environment,pos,atmosphere,8,"relaxed(4), typical(2), great(2)"
+environment,pos,presentation,6,"great(2), excellent(2), beautiful(2)"
+environment,pos,vibe,3,great(3)
+environment,pos,environment,3,vibrant(3)
+environment,pos,touch,2,nice(2)
+environment,pos,mexican,2,good(2)
+environment,pos,team,2,amazing(2)
+environment,pos,quality,2,amazing(2)
+price,pos,price,29,"reasonable(15), affordable(6), good(5), worth(3)"
+price,pos,value,7,"good(4), great(3)"
+price,pos,food,4,worth(4)
+price,pos,quality,4,good(4)
+price,pos,michelin,4,affordable(4)
+service,neg,service,9,"amazing(5), favorite(2), fantastic(2)"
+service,pos,staff,12,"friendly(4), great(2), excellent(2), attentive(2), amazing(2)"
+service,pos,service,3,attentive(3)
+service,pos,access,3,easy(3)
+service,pos,server,2,attentive(2)
+taste,neg,food,2,busy(2)
+taste,pos,seafood,183,"fresh(168), delicious(11), fantastic(2), excellent(2)"
+taste,pos,food,171,"good(38), amazing(34), delicious(30), great(24), fresh(13)"
+taste,pos,taco,44,"good(15), great(8), delicious(5), incredible(4), amazing(4)"
+taste,pos,flavor,36,"great(7), smoky(6), bold(5), fresh(4), good(2)"
+taste,pos,fish,32,"fresh(17), good(8), amazing(3), delicious(2), tender(2)"
+taste,pos,sauce,20,hot(20)
+taste,pos,lemonade,19,"sparkling(14), good(3), amazing(2)"
+taste,pos,meal,16,"delicious(7), good(6), amazing(3)"
+taste,pos,menu,13,"tasting(11), amazing(2)"
+taste,pos,service,13,"delicious(9), fresh(2), stew(2)"
+taste,pos,dish,10,"delicious(4), exquisite(2), good(2), amazing(2)"
+taste,pos,ceviche,9,"delicious(3), fresh(2), great(2), amazing(2)"
+taste,pos,ingredient,4,fresh(4)
+taste,pos,octopus,4,tender(4)
+taste,pos,gem,2,culinary(2)
+taste,pos,don,2,amazing(2)
+taste,pos,chocolate,2,dark(2)
+taste,pos,branzino,2,fresh(2)
+taste,pos,sea,2,fresh(2)
+taste,pos,uni,2,fresh(2)
+taste,pos,oyster,2,fresh(2)
+taste,pos,shrimp,2,fresh(2)
+waiting_time,neg,wait,13,"long(10), worth(3)"
+waiting_time,neg,time,3,long(3)
+waiting_time,neg,food,2,wait(2)
+waiting_time,neg,minute,2,ish(2)
+waiting_time,neg,hour,2,half(2)
+waiting_time,pos,service,16,"fast(12), quick(2), long(2)"

@@ -7,6 +7,7 @@ from spotlite.config.logging_config import setup_logging
 from spotlite.crawler.google_maps.reviews import scrape_reviews_for_url, save_reviews
 from spotlite.crawler.google_maps.details import get_place_details, get_place_id, save_details
 from spotlite.analysis.keywords import analyze_keywords
+from spotlite.analysis.aspect_phrases import analyze_aspect_phrases
 
 
 API_KEYS = load_config("api_keys.json")
@@ -44,6 +45,12 @@ def cmd_analyze(args):
     analyze_keywords(input_path)
 
 
+# Aspect phrases subcommand handler
+def cmd_phrases(args):
+    input_path = args.input
+    analyze_aspect_phrases(input_path)
+
+
 # ---------- Main CLI ----------
 
 def build_parser():
@@ -75,6 +82,13 @@ def build_parser():
     p_analyze.add_argument("-i", "--input", required=True,
                            help="Path to reviews.json")
     p_analyze.set_defaults(func=cmd_analyze)
+
+    # phrases
+    p_phrases = subparsers.add_parser(
+        "phrases", help="Extract aspect phrases and summaries")
+    p_phrases.add_argument("-i", "--input", required=True,
+                           help="Path to reviews.json")
+    p_phrases.set_defaults(func=cmd_phrases)
 
     return parser
 
