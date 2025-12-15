@@ -96,6 +96,7 @@
     "stuff",
     "spoon",
     "fork",
+    "utensil",
     "knife",
     "napkin",
     "cup",
@@ -143,6 +144,19 @@
     "featured",
     "have",
     "had",
-    "has"
+    "has",
+    "downtown",
+    "university",
+    "campus",
+    "village",
+    "town",
+    "city",
+    "not_sure",
+    "pro_tip",
+    "high_end",
+    "los_angeles",
+    "united_states",
+    "definitely_want",
+    "catch_eye"
   ]
 }
