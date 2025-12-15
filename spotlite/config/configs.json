@@ -3,6 +3,7 @@
     "google_map_reviews_output_root": "data/google_map/reviews",
     "google_map_details_output_root": "data/google_map/details",
     "keywords_output_root": "outputs",
+    "aspect_phrases_output_root": "outputs/aspect_phrases",
     "logs_root": "logs"
   },
 

@@ -1,7 +1,7 @@
-import json
+
 from pathlib import Path
 import re
-
+from spotlite.utils.io_utils import load_json
 
 URL_RE = re.compile(r"http\S+|www\.\S+")
 NON_ALPHA_RE = re.compile(r"[^a-z\s]")
@@ -9,8 +9,8 @@ MULTI_SPACE_RE = re.compile(r"\s+")
 
 
 def load_reviews_json(path: Path):
-    with open(path, "r", encoding="utf-8") as f:
-        data = json.load(f)
+    """Load reviews from a JSON file, returning a list of cleaned text reviews."""
+    data = load_json(path)
     if isinstance(data, dict) and "reviews" in data:
         data = data["reviews"]
     raw = []

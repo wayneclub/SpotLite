@@ -10,6 +10,7 @@ import requests
 
 from spotlite.config.config import load_config
 from spotlite.crawler.google_maps.browser_utils import expand_maps_share_url
+from spotlite.utils.io_utils import save_json
 
 API_CFG = load_config("api.json")
 CRAWLER_CFG = load_config("crawler.json")
@@ -70,7 +71,7 @@ def get_place_id(api_key: str, url: str):
 
     # 若完全拿不到 text_query，只能放棄
     if not text_query:
-        logger.error(f"❌ 無法從 URL 解析出可用的店名/text_query: {expanded}")
+        logger.error("❌ 無法從 URL 解析出可用的店名/text_query: %s", expanded)
         return None
 
     # 4) 使用店名 + (可選) 經緯度呼叫 find_place_id
@@ -79,19 +80,34 @@ def get_place_id(api_key: str, url: str):
         return place_id
 
     logger.error(
-        f"❌ 使用 Find Place/Text Search 仍無法找到 place_id，text_query={text_query}, latlng={latlng}")
+        "❌ 使用 Find Place/Text Search 仍無法找到 place_id，text_query=%s, latlng=%s",
+        text_query,
+        latlng,
+    )
     return None
 
 
 def _debug_print_api(name: str, payload: dict):
     try:
-        status = payload.get("status")
-        err = payload.get("error_message")
-        candidates = payload.get("candidates")
-        results = payload.get("results")
-        logger.debug(f"{name} status={status} candidates={len(candidates) if isinstance(candidates, list) else None} results={len(results) if isinstance(results, list) else None} error={err}")
-    except Exception:
-        pass
+        status = payload.get("status") if isinstance(payload, dict) else None
+        err = payload.get("error_message") if isinstance(
+            payload, dict) else None
+        candidates = payload.get("candidates") if isinstance(
+            payload, dict) else None
+        results = payload.get("results") if isinstance(payload, dict) else None
+        cand_len = len(candidates) if isinstance(candidates, list) else None
+        res_len = len(results) if isinstance(results, list) else None
+        logger.debug(
+            "%s status=%s candidates=%s results=%s error=%s",
+            name,
+            status,
+            cand_len,
+            res_len,
+            err,
+        )
+    except (TypeError, AttributeError, KeyError) as e:
+        logger.debug(
+            "_debug_print_api encountered non-standard payload structure: %s", e)
 
 # Resolve and expand shared short URLs to their final destination
 
@@ -182,7 +198,10 @@ def save_details(details, place_id):
         return
     if details.get("status") != "OK":
         logger.error(
-            f"❌ API Error: {details.get('status')} {details.get('error_message')}")
+            "❌ API Error: %s %s",
+            details.get("status"),
+            details.get("error_message"),
+        )
         return
     os.makedirs(DETAILS_OUTPUT_ROOT, exist_ok=True)
 
@@ -190,6 +209,5 @@ def save_details(details, place_id):
     safe_name = re.sub(r'[\\/*?:"<>|]', "_", place_name) or "place"
     filename = os.path.join(DETAILS_OUTPUT_ROOT, f"{safe_name}_details.json")
 
-    with open(filename, "w", encoding="utf-8") as f:
-        json.dump(details, f, ensure_ascii=False, indent=2)
-    logger.info(f"✅ Saved details to {filename}")
+    save_json(filename, details)
+    logger.info("✅ Saved details to %s", filename)

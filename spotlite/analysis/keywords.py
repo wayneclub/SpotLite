@@ -9,7 +9,6 @@ SpotLite Keyword Analyzer (English-only)
   - SUMMARY.txt
 """
 
-import json
 import re
 import math
 import logging

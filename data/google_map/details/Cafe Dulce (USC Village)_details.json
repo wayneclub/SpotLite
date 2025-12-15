@@ -1,0 +1,459 @@
+{
+  "html_attributions": [],
+  "result": {
+    "address_components": [
+      {
+        "long_name": "Ste 1420",
+        "short_name": "Ste 1420",
+        "types": [
+          "subpremise"
+        ]
+      },
+      {
+        "long_name": "3096",
+        "short_name": "3096",
+        "types": [
+          "street_number"
+        ]
+      },
+      {
+        "long_name": "McClintock Avenue",
+        "short_name": "McClintock Ave",
+        "types": [
+          "route"
+        ]
+      },
+      {
+        "long_name": "South Los Angeles",
+        "short_name": "South Los Angeles",
+        "types": [
+          "neighborhood",
+          "political"
+        ]
+      },
+      {
+        "long_name": "Los Angeles",
+        "short_name": "Los Angeles",
+        "types": [
+          "locality",
+          "political"
+        ]
+      },
+      {
+        "long_name": "Los Angeles County",
+        "short_name": "Los Angeles County",
+        "types": [
+          "administrative_area_level_2",
+          "political"
+        ]
+      },
+      {
+        "long_name": "California",
+        "short_name": "CA",
+        "types": [
+          "administrative_area_level_1",
+          "political"
+        ]
+      },
+      {
+        "long_name": "United States",
+        "short_name": "US",
+        "types": [
+          "country",
+          "political"
+        ]
+      },
+      {
+        "long_name": "90007",
+        "short_name": "90007",
+        "types": [
+          "postal_code"
+        ]
+      }
+    ],
+    "adr_address": "<span class=\"street-address\">3096 McClintock Ave Ste 1420</span>, <span class=\"locality\">Los Angeles</span>, <span class=\"region\">CA</span> <span class=\"postal-code\">90007</span>, <span class=\"country-name\">USA</span>",
+    "business_status": "OPERATIONAL",
+    "current_opening_hours": {
+      "open_now": true,
+      "periods": [
+        {
+          "close": {
+            "date": "2025-11-30",
+            "day": 0,
+            "time": "2000"
+          },
+          "open": {
+            "date": "2025-11-30",
+            "day": 0,
+            "time": "0800"
+          }
+        },
+        {
+          "close": {
+            "date": "2025-12-01",
+            "day": 1,
+            "time": "2000"
+          },
+          "open": {
+            "date": "2025-12-01",
+            "day": 1,
+            "time": "0800"
+          }
+        },
+        {
+          "close": {
+            "date": "2025-11-25",
+            "day": 2,
+            "time": "2000"
+          },
+          "open": {
+            "date": "2025-11-25",
+            "day": 2,
+            "time": "0800"
+          }
+        },
+        {
+          "close": {
+            "date": "2025-11-26",
+            "day": 3,
+            "time": "2000"
+          },
+          "open": {
+            "date": "2025-11-26",
+            "day": 3,
+            "time": "0800"
+          }
+        },
+        {
+          "close": {
+            "date": "2025-11-27",
+            "day": 4,
+            "time": "2000"
+          },
+          "open": {
+            "date": "2025-11-27",
+            "day": 4,
+            "time": "0800"
+          }
+        },
+        {
+          "close": {
+            "date": "2025-11-28",
+            "day": 5,
+            "time": "2000"
+          },
+          "open": {
+            "date": "2025-11-28",
+            "day": 5,
+            "time": "0800"
+          }
+        },
+        {
+          "close": {
+            "date": "2025-11-29",
+            "day": 6,
+            "time": "2000"
+          },
+          "open": {
+            "date": "2025-11-29",
+            "day": 6,
+            "time": "0800"
+          }
+        }
+      ],
+      "weekday_text": [
+        "Monday: 8:00 AM – 8:00 PM",
+        "Tuesday: 8:00 AM – 8:00 PM",
+        "Wednesday: 8:00 AM – 8:00 PM",
+        "Thursday: 8:00 AM – 8:00 PM",
+        "Friday: 8:00 AM – 8:00 PM",
+        "Saturday: 8:00 AM – 8:00 PM",
+        "Sunday: 8:00 AM – 8:00 PM"
+      ]
+    },
+    "delivery": true,
+    "dine_in": true,
+    "editorial_summary": {
+      "language": "en",
+      "overview": "Funky craft coffee shop with inventive donut flavors & modern salads in industrial warehouse digs."
+    },
+    "formatted_address": "3096 McClintock Ave Ste 1420, Los Angeles, CA 90007, USA",
+    "formatted_phone_number": "(213) 536-5609",
+    "geometry": {
+      "location": {
+        "lat": 34.0253658,
+        "lng": -118.2853227
+      },
+      "viewport": {
+        "northeast": {
+          "lat": 34.02699938029151,
+          "lng": -118.2844741197085
+        },
+        "southwest": {
+          "lat": 34.02430141970851,
+          "lng": -118.2871720802915
+        }
+      }
+    },
+    "icon": "https://maps.gstatic.com/mapfiles/place_api/icons/v1/png_71/cafe-71.png",
+    "icon_background_color": "#FF9E67",
+    "icon_mask_base_uri": "https://maps.gstatic.com/mapfiles/place_api/icons/v2/cafe_pinlet",
+    "international_phone_number": "+1 213-536-5609",
+    "name": "Cafe Dulce (USC Village)",
+    "opening_hours": {
+      "open_now": true,
+      "periods": [
+        {
+          "close": {
+            "day": 0,
+            "time": "2000"
+          },
+          "open": {
+            "day": 0,
+            "time": "0800"
+          }
+        },
+        {
+          "close": {
+            "day": 1,
+            "time": "2000"
+          },
+          "open": {
+            "day": 1,
+            "time": "0800"
+          }
+        },
+        {
+          "close": {
+            "day": 2,
+            "time": "2000"
+          },
+          "open": {
+            "day": 2,
+            "time": "0800"
+          }
+        },
+        {
+          "close": {
+            "day": 3,
+            "time": "2000"
+          },
+          "open": {
+            "day": 3,
+            "time": "0800"
+          }
+        },
+        {
+          "close": {
+            "day": 4,
+            "time": "2000"
+          },
+          "open": {
+            "day": 4,
+            "time": "0800"
+          }
+        },
+        {
+          "close": {
+            "day": 5,
+            "time": "2000"
+          },
+          "open": {
+            "day": 5,
+            "time": "0800"
+          }
+        },
+        {
+          "close": {
+            "day": 6,
+            "time": "2000"
+          },
+          "open": {
+            "day": 6,
+            "time": "0800"
+          }
+        }
+      ],
+      "weekday_text": [
+        "Monday: 8:00 AM – 8:00 PM",
+        "Tuesday: 8:00 AM – 8:00 PM",
+        "Wednesday: 8:00 AM – 8:00 PM",
+        "Thursday: 8:00 AM – 8:00 PM",
+        "Friday: 8:00 AM – 8:00 PM",
+        "Saturday: 8:00 AM – 8:00 PM",
+        "Sunday: 8:00 AM – 8:00 PM"
+      ]
+    },
+    "photos": [
+      {
+        "height": 3024,
+        "html_attributions": [
+          "<a href=\"https://maps.google.com/maps/contrib/103714456755345789855\">A-Kwon Fang</a>"
+        ],
+        "photo_reference": "AWn5SU73whcsYdeyzA64qpQS0wZVWvbtVldLJL3HGvxf9Az_4dOm8A8w_wOssIIvsM5E5W5rOf-xyuHjfIuvRyp2H2dZU0G4-xWqfpVk8zfA7Y5hHZ7MVsu4gh6TnDw6ntGIbBYp5tac-Vluz9YnEeiP6te47TcJr_tLgkMEcezD1HqAC4iUh0H03vdRTT8vjFU-ZFXA9xBu56cl4srZzyNBQJvobj25PSWPdHEGtzE1GEFKlk67HoKVQbFWB5-PnxbRwi6IrhStwcBHDlFyDCyisbRfBTBejYMCYnQm67fKlrWH73odO-J0REq42Ydb7dCOhA6dp3cXI8L0z9fh1POvqBBA0Gx7aeripo1HfZdIkrhWAGR0Fpv57XQLkSIG71peRFfMUpxG8FB_M4I45luOTEWWvR1p7hFLqRrMHF94BexMjn1qP1YLY7HOyUwHFt1m",
+        "width": 4032
+      },
+      {
+        "height": 3024,
+        "html_attributions": [
+          "<a href=\"https://maps.google.com/maps/contrib/111826548266916888109\">Jane Fang</a>"
+        ],
+        "photo_reference": "AWn5SU58yEDiNPjfSkuidXNa1wiDu-exKiiW1jd3Sc7_HHPI_RpAT9yjvpms-YrWxt_x4yB36qWDujmPpAsAhZhVyViB3XSw6o-U0EgZXmfteNvsjet7vn34Sa9Zj_TLU3lbGThRbaLen43liFjcJkEWZvwU4M94duZQBTYzF4Y1uNySelymnk11W1pNi6wnFAMqcZizeg8ghzelbPMBOf3-d_MRjSUPoi_5ISSJ3E8q_jU-Qwh_vk2kVhrn6VdD2_RyVEdVO0fVXdcwt9gIzjCg5EgaiDy3bXR_20uolKP46yEZA7HwZNOh1qf4kwRhzQfhtJ-OzE6UD7X6rhfPtQcvCGJFF4nmqXZ_2MVkJ5MFk3gZXaFCMzZMTvL5rutHgMfwZ13rhVGfY9BcTONEgmLvrRRWe746241DtISjaO45qxvZ6Q",
+        "width": 3024
+      },
+      {
+        "height": 4032,
+        "html_attributions": [
+          "<a href=\"https://maps.google.com/maps/contrib/111219156892898849027\">Aimee Zheng</a>"
+        ],
+        "photo_reference": "AWn5SU4j-LW9BwytRFQeDWoqIBkdJgQ0YZQyQLB-NHEkyWx1h5i4TxqSdt47lP64E2FnT6qZn4KNFQHDaJCUIRBzyYxLWK4MOLRi80coxqozSevIyVzuMM3jhXMaEln7M1jUDUs-smBZsDU4WkBzFcgcSHbgvrbPWGVYu_BHpcakjQKjQIrNHnSY4Rm2C07cvnqicpPAkJ_zmJ2gVKKZy9BS_aF7wFEasCqFaXatZy0ZcKpz45LjKbaBIkUCfkosxSqGDue5u8j9Bq4kS9sPS0T9pSXja2lq4fLHmPR3HQMIvzfDwbOIzdGxWYmMfjzx43CaQeZFMCmWnuGp2bt_kI-0Sv9JKwF5E_QcG-le3RFJJyltd6oMC1OCGUm6MT1R8c62h4Bc01E6CdOvzxRbHMV7TkvYP5JHYir9SWyjYpC9GJ2Q0Rq1uAlRsPkA_d4_kBgu",
+        "width": 3024
+      },
+      {
+        "height": 4032,
+        "html_attributions": [
+          "<a href=\"https://maps.google.com/maps/contrib/112551682704861931091\">재구언</a>"
+        ],
+        "photo_reference": "AWn5SU67EKxn7e1ICYT4s7ohf6VluhjF7uVhNYNZCl6iauikTBE2Ayq46AFOyGyFYMz0IUTBCXxwJOIxPg5pg5G4xv-VtO1W7pVrfEpsHHJSq34pgyYpezADpXJ1wDKT9GNU9BLFOLNv6f6OGoUCaP1lTi3zgZR2NLo18WeG3R8DK2OhnBaxQqJtW3rHjhO7kjUKyb9ASWU513gzAapYLNA7KxOTdxRhC8JER1gjjOZlwhh0ilL5u76iDc0Ax1kn1ISK2okLfyE4sEhq8sFUqNCyi2VAcmZpQ7oIvnMqFvf1kOoxDhtdTmm8o6zKOgPFN07wpipoxV3YIFg5Q9EXHypV_QkoCEuIeOH6WNTP_cENfx7Hxhroovok8eGmawAAX7vWw5jr5PoUnomfvEpAshlidL8CS-sxOYFumWk7qDeFXcM",
+        "width": 3024
+      },
+      {
+        "height": 4000,
+        "html_attributions": [
+          "<a href=\"https://maps.google.com/maps/contrib/105932156904959515841\">Yuval K</a>"
+        ],
+        "photo_reference": "AWn5SU6gSTfsSZjfN4SaKKsaco5CjPRPp4qq9E-1pWowT85c1G_LhEPRaJaFhRgLS3ZeOkLRYlEpdO_zknc2F4CTW-CufyMekAVo87WPKosA0ia1b3l9_1H-95ih28qqvaV8yDQcxXQptSXF7Oj3BWX46VQafpjhb4AHjAhy0Eh2tIYJjDKAEUdmK3itqsFUGd5QIstPwlEtDOch7rpoHDpqW3QbXh6ihYHzlqcCzgKGY1B4T5JbRe2qfvJQkWOeLmagSwDXUr-OQTvYFwnYQRVddIuF5m9-xhYWQudHcNK46VLddi0IREydSOBPHhz7FzN61U357LKvyOmjs3bD-VyIJBrq84DGwsdF9PDXRZxelvIVRsukylPW8djq2-avEPMhLiyNlajUA2tI_CjPS6yN-iI4x8hF0U_ElPxwqLJvTdIGlCU1FzCSvGOobzP64r5-",
+        "width": 3000
+      },
+      {
+        "height": 3024,
+        "html_attributions": [
+          "<a href=\"https://maps.google.com/maps/contrib/103714456755345789855\">A-Kwon Fang</a>"
+        ],
+        "photo_reference": "AWn5SU5o2eQYUAQnI3YDwRfEqNUM1YCSyqbrTw7pOU2NinYWHroP6REV9VWE_KCas4nvqtvI4OBZ1-hFFP8uAVfieJaUIgGYQJad-R9prlghfHfyfCpLVDj1yEFjVZEZyzSeWgTabX2T709DOhKRMrlTCkZb0SVbQKNj2XyuAZGhWa49ebNy8i8GccpkMhQoArOVHcNToTT4Uxw8LUAy49-kk-wkNup-ngMvYYjbesEzqHZeJKgkS9jySlhoHx_6hoj2XVqOSBBXf_H3mExBusHXGwF0Dqw1GSFbys0-_cV7jiacEJd0eJsQ7XU3RflisLt4oSpQjxjDw4QoivuDqnEhsLuQAFRxK_x9W2lHTvAP1tuHH7sAqtRPLwtl5fo9az7N_0g7dDF_AWpx3GS8TmtLW5Q6vnM4NIVrbt8UaE6VCQVqgZQbnnsOee7JBEDWUeb7",
+        "width": 4032
+      },
+      {
+        "height": 3024,
+        "html_attributions": [
+          "<a href=\"https://maps.google.com/maps/contrib/103714456755345789855\">A-Kwon Fang</a>"
+        ],
+        "photo_reference": "AWn5SU4Zkm1fYApndBrvT81zisDFI0m9aI6j2umVfCoZ2YNQ_9998OKoSh2uRqCjX8HJCDVPZNZV4Sk2ZsfPWu9GZoXuM_xKUnL_4XP5_8AtwMKvXqtrsc3U6sV8sy_LB9UlTEjT7azwFoDeqew4VnTTEu3P4iS_1wEvGwslvEV5iYKLFQun7rJeHuPC8judaRLXFQ88tYTBC2ftdg9kPnU-9BhXirKbTOqiJ5EvfEbnF4EmE789UmvdZrbUKL0TiSL95SKyerk3ppgO8itm_AoZto4PwbR4Urxp8j5h0FN43nIZyTo1Lb0kGmdzNISduUxWudZXqd7uS-48uHlvn01gA-J_kCMJUMZTci0f_8Yzc3d46FuomtmM6eFayyi0AUz0VNl33ws2HeT288WNCj6M7OAsJd4t7jYP8Kxja9nme14e4YU4rbvkRoB30LBWyAPL",
+        "width": 4032
+      },
+      {
+        "height": 816,
+        "html_attributions": [
+          "<a href=\"https://maps.google.com/maps/contrib/103405929509796969965\">Soefae Chen</a>"
+        ],
+        "photo_reference": "AWn5SU4dp6WxX221WE-hfPWUUP4ONMwJjaKqEBmtO4KGFJD26Xav7Q7vK2JVPjJQPccOP2nw4AvXwS3FDErKdq-EzkvVAkH3RJnJ_gLOe6N60ZaQKzvMLChZb2s0ZBw1pOZt4Pfe0yuKVb4fcYzkOGRCfMBHj-Wq7LYzwB9tJ63910599zJcBJsUCP0jQyL-UlyExACEfTvzaQah1D853F_c_AUxdbDCcG-p0X6V_G3wX3etxmrGQ9WDCy1ZuF3Pi8J3LORX17caizX8UI04CdATzazQA12Ln_CMb5AcQWakK62OgmzqP9UubYx_9wD8gBCXwBQ1JbQwtlQMB5zGD_5eNsHrUtP6ibZU2j5Sb7QbakzYtxdUhpeuSeCbWXTJxyHt4WFDkr3ZdDaoFTEChVFa-eylR5HzvoRxoznE5YE5A8eozRwBYqGFfxBeQ-qyHkR7",
+        "width": 853
+      },
+      {
+        "height": 3000,
+        "html_attributions": [
+          "<a href=\"https://maps.google.com/maps/contrib/114170346783709453335\">Stephen Lee</a>"
+        ],
+        "photo_reference": "AWn5SU7Ew_DYrrsYFRsWdyZxCoQOhzVx6DjGx_khKiuz7Y2Vp_N0dab_J9QpnD5rWJGF2dV8zfvDTxVwd4T3wB9IrLjbCQSo4x31cs7QeutYZd-JdiIMAI5ZuEGDamilULrZlyHE-xvqVkIw71WeFzztGfugd9ob3ZchCPd7u8PdRpQjetVOmvsWV3_Z5BeD5p1d3313iRGdMFTMLMi3sy7HlTvWahZwjRpVRAG0U0yUVCfj5MCNS023LDymIvXhc4V8xZCB-VRdmUfKQ8YkN7Hh_wiTukNgWYmvzWugYQjobW5rkX7AEyF-2Z679sgYGvgBGu9r5jy-vPuiU8R-0-F_AJDTqDoOrzKL6xUSmcJjL_Ia7XWfkG2P24oZaBKLmM2bWCpBlukv_qjcO_U2gSU88Ur22I2_MD95aqYE2JMsX4DcsXXP",
+        "width": 4000
+      },
+      {
+        "height": 4000,
+        "html_attributions": [
+          "<a href=\"https://maps.google.com/maps/contrib/105932156904959515841\">Yuval K</a>"
+        ],
+        "photo_reference": "AWn5SU7w9rQW7OL0P99RUekMH3j51aFnYzlCNIu75ifjY4a_TVvj0X2iiPl8O8QwuorzfbOgw7xz692rRXeKMSV5TJwVQkWCYjEmVSq77-73lry-6gONDYI1dVTk-DYeKyD_qsBABE0K8tL7Xa2MTxfXKwpZ0uiuIaOlZQ1Z1_z7mj6VZ9Yc5UEvCX4Gdc4YW4DgfCFPq0miAbrBlT0E3JZjC1dCCJqtJGauRpcgIlOFflWtE2O2RV37qD3fo1Ib9r0IMZdrsVz4_96_bfvy1OqLxJzR733PejrggaRzYMusuQksLp1muDv5DeiTMv5tbQEvQFyT4kEjA-i5VEg7jGumY3v-NLvMjWVABTYbEtfZDPFHjb9sIynwooTOjTVpkHTznr7Kla1rR8KsMRf0KTavWvne5Lo_t7qGImQ7iUtotV1c8U4WpqOWHXAWCOsCS99o",
+        "width": 3000
+      }
+    ],
+    "place_id": "ChIJW-W3cuXHwoARybuUzJ-ussE",
+    "plus_code": {
+      "compound_code": "2PG7+4V Los Angeles, CA, USA",
+      "global_code": "85632PG7+4V"
+    },
+    "price_level": 2,
+    "rating": 4.4,
+    "reference": "ChIJW-W3cuXHwoARybuUzJ-ussE",
+    "reservable": false,
+    "reviews": [
+      {
+        "author_name": "Summer Almansour",
+        "author_url": "https://www.google.com/maps/contrib/103134600598260595944/reviews",
+        "profile_photo_url": "https://lh3.googleusercontent.com/a/ACg8ocJQLzcc2WnP0kaNhE6Y3S996TTwQKUeXWZLr2p9Gbofa7UJwKE=s128-c0x00000000-cc-rp-mo",
+        "rating": 3,
+        "relative_time_description": "in the last week",
+        "text": "",
+        "time": 1763748885,
+        "translated": false
+      },
+      {
+        "author_name": "李珮慈",
+        "author_url": "https://www.google.com/maps/contrib/101609343762976630650/reviews",
+        "language": "en",
+        "original_language": "en",
+        "profile_photo_url": "https://lh3.googleusercontent.com/a-/ALV-UjVe1TW74K9hRNhiaZ2C1vytaGeXNZ1DXIr-rJwazqEcn5o91Hj7uA=s128-c0x00000000-cc-rp-mo-ba5",
+        "rating": 5,
+        "relative_time_description": "3 weeks ago",
+        "text": "The hottest spot in USC village! We got Pastrami sandwitch, matcha latte and Hong Kong tea latte, the sandwitch is delicious !! full of meat and the portion is big.\nThe space inside the store is small and noisy, it's better eat outside, enjoying the sun and breeze.\n\nI tried the breakfast burrito before, it's tasty too!\nDefinately would come back and try different meal next time.\nLove Dulce as always ",
+        "time": 1762141810,
+        "translated": false
+      },
+      {
+        "author_name": "Jagroop Kaur",
+        "author_url": "https://www.google.com/maps/contrib/105433192705674690777/reviews",
+        "language": "en",
+        "original_language": "en",
+        "profile_photo_url": "https://lh3.googleusercontent.com/a/ACg8ocIwsNjP_4YMnpDcGTDeny9TSwS_i_BcxNZtt7nLDos3hTRKOFs=s128-c0x00000000-cc-rp-mo-ba3",
+        "rating": 5,
+        "relative_time_description": "3 weeks ago",
+        "text": "Wait can be long at lunch time\n\nFood and drinks are worth it! Reasonably priced as well\n\nMatcha is sweet but great! Iced pumpkin latte was also nice just one size only :|\n\nKale peanut salad is AMAZING. that SAUCE",
+        "time": 1761685690,
+        "translated": false
+      },
+      {
+        "author_name": "Diana Kim",
+        "author_url": "https://www.google.com/maps/contrib/116483588748307033059/reviews",
+        "language": "en",
+        "original_language": "en",
+        "profile_photo_url": "https://lh3.googleusercontent.com/a-/ALV-UjWGf5eBZBl6HkpsFWLrdaQvEoXNVNgpOgpqkP94kA_q8dCPVc_z=s128-c0x00000000-cc-rp-mo-ba5",
+        "rating": 5,
+        "relative_time_description": "4 weeks ago",
+        "text": "The line is always popping off and for good reason! I got the chicken peanut salad, which was massive in portion and so fresh and flavorful. 🥗 Also grabbed an americano (loved their espresso blend, bold but smooth) and a premium ceremonial-grade matcha with almond milk, which was actually so good ! Everything tasted high quality, and the vibes were lively with plenty of seating inside and outside. Definitely recommend stopping by if you’re at USC! ☕❤️💛",
+        "time": 1761536914,
+        "translated": false
+      },
+      {
+        "author_name": "Wesley Erickson",
+        "author_url": "https://www.google.com/maps/contrib/110387233885894646736/reviews",
+        "language": "en",
+        "original_language": "en",
+        "profile_photo_url": "https://lh3.googleusercontent.com/a/ACg8ocIBOY_t0CKbKimeOCJcDaTmkxIzSVdHgS8Dn_MZ0PmAs0cPlg=s128-c0x00000000-cc-rp-mo-ba4",
+        "rating": 5,
+        "relative_time_description": "a month ago",
+        "text": "Cafe Dulce sandwiches and salads just hit different!!! I ordered the Spicy Chicken sandwich, which had herb-roasted chicken breast, tomatoes, house slaw, provolone & sweet chili sauce, and the Peanut Kale salad, which had fresh herbs, serrano, roasted peanut vinaigrette & grated reggiano. Everything was so fresh and delicious, especially the bread on the sandwich!!!! I appreciated that they had plenty of vegan options for my vegan friend, and can’t wait to come back and try other ones.\n\nThe line was worth the wait, and it wasn’t terribly bad. Went fairly quickly for a weekend crowd and food came out fast. The music inside was too loud for conversation, but there is a patio area and the food and service were excellent!",
+        "time": 1761026908,
+        "translated": false
+      }
+    ],
+    "serves_beer": true,
+    "serves_breakfast": true,
+    "serves_brunch": true,
+    "serves_dinner": true,
+    "serves_lunch": true,
+    "serves_vegetarian_food": true,
+    "serves_wine": true,
+    "takeout": true,
+    "types": [
+      "cafe",
+      "establishment",
+      "food",
+      "point_of_interest"
+    ],
+    "url": "https://maps.google.com/?cid=13957410196529920969",
+    "user_ratings_total": 495,
+    "utc_offset": -480,
+    "vicinity": "University Village, 3096 McClintock Ave Ste 1420, Los Angeles",
+    "wheelchair_accessible_entrance": true
+  },
+  "status": "OK"
+}

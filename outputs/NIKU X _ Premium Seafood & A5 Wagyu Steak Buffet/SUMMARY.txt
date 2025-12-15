@@ -1,5 +1,0 @@
-Total reviews: 1243
-After cleaning: 1243
-Vocabulary size: 1000
-Top keywords extracted: 50
-N-grams: (1, 2), min_df=2, max_features=1000

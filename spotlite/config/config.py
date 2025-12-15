@@ -1,19 +1,9 @@
-import json
 from pathlib import Path
+from spotlite.utils.io_utils import load_json
 
-# Directory containing config files
-CONFIG_DIR = Path(__file__).resolve().parent
-PROJECT_ROOT = CONFIG_DIR.parent
 
 # cache for arbitrary config files
 _CONFIG_CACHE: dict[str, dict] = {}
-
-
-def _load_json(path: Path) -> dict:
-    if not path.exists():
-        return {}
-    with path.open("r", encoding="utf-8") as f:
-        return json.load(f)
 
 
 def load_config(name: str) -> dict:
@@ -34,12 +24,17 @@ def load_config(name: str) -> dict:
 
     data = {}
     if cfg_path.exists():
-        data = _load_json(cfg_path)
+        data = load_json(cfg_path)
     elif example_path.exists():
-        data = _load_json(example_path)
+        data = load_json(example_path)
 
     _CONFIG_CACHE[name] = data
     return data
+
+
+CONFIG_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = CONFIG_DIR.parent
+DOMAINS_ROOT = PROJECT_ROOT / "config/domains"
 
 
 def get_config() -> dict:

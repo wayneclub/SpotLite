@@ -1,7 +1,7 @@
 
+
 import re
 import time
-import json
 from datetime import datetime, timedelta
 from pathlib import Path
 import logging
@@ -13,6 +13,10 @@ from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import WebDriverException
 
+# === Added imports for structured parsing ===
+from typing import Any, Dict
+
+from spotlite.utils.io_utils import save_json, save_csv
 from spotlite.crawler.google_maps.browser_utils import (
     create_en_browser,
     ensure_hl_en,
@@ -61,7 +65,6 @@ STOP_AT_YEARS_AGO = REVIEWS_CFG.get("stop_at_years_ago", 2)
 OUTPUT_ROOT = Path(PATH_CFG.get(
     "google_map_reviews_output_root", "data/google_map/reviews"))
 SAVE_JSON = REVIEWS_CFG.get("save_json", True)
-SAVE_CSV = REVIEWS_CFG.get("save_csv", True)
 
 
 def click_safely(browser, elem):
@@ -77,7 +80,7 @@ def click_safely(browser, elem):
     )
     try:
         elem.click()
-    except Exception:
+    except WebDriverException:
         browser.execute_script('arguments[0].click();', elem)
     time.sleep(0.8)
 
@@ -110,9 +113,11 @@ def open_reviews_tab(browser):
         )
         click_safely(browser, reviews_tab)
         time.sleep(1.0)
-    except Exception:
+    except WebDriverException as e:
         logger.warning(
-            "⚠️ Reviews tab not found; maybe already on Reviews or selector needs update")
+            "⚠️ Reviews tab not found; maybe already on Reviews or selector needs update (%s)",
+            e,
+        )
 
 
 def sort_reviews_newest(browser):
@@ -160,9 +165,11 @@ def sort_reviews_newest(browser):
         else:
             logger.warning(
                 "⚠️ Could not find 'Newest' option in sort menu; using default order.")
-    except Exception:
+    except WebDriverException as e:
         logger.warning(
-            "⚠️ Sort button or menu not found; proceeding without changing sort order.")
+            "⚠️ Sort button or menu not found; proceeding without changing sort order. (%s)",
+            e,
+        )
 
 
 def find_review_container(browser):
@@ -172,9 +179,9 @@ def find_review_container(browser):
             container = WebDriverWait(browser, 10).until(
                 EC.presence_of_element_located((By.CSS_SELECTOR, css))
             )
-            logger.info(f"✅ Review container found via: {css}")
+            logger.info("✅ Review container found via: %s", css)
             return container
-        except Exception:
+        except WebDriverException:
             continue
 
     logger.warning(
@@ -297,36 +304,107 @@ def parse_review_element(el) -> dict:
     html = el.get_attribute('outerHTML')
     s = Soup(html, 'lxml')
 
-    reviewer = s.select_one('.d4r55.fontTitleMedium')
+    reviewer_el = s.select_one('.d4r55.fontTitleMedium')
     star_el = s.select_one(STAR_SEL)
     date_el = s.select_one(DATE_SELECTOR)
     raw_date = date_el.get_text(strip=True) if date_el else ''
     normalized_date = normalize_review_date(raw_date)
 
-    # Main review text block
-    text_el = s.select_one('.MyEned, .section-review-text')
-    base_text = text_el.get_text(' ', strip=True) if text_el else ''
-
     # Structured details (Service, Meal type, Price per person, etc.)
     structured_summary = extract_structured_summary(s)
 
-    if structured_summary:
-        if base_text:
-            full_text = base_text + '\n\n' + structured_summary
-        else:
-            full_text = structured_summary
+    # Main review text block (plain text only, without structured block)
+    text_root = s.select_one('.MyEned, .section-review-text')
+    if text_root is not None:
+        # Remove the structured block so "Food: 1 Service: 1 ..." does not leak into plain_text
+        for sub in text_root.select(STRUCTURED_BLOCK_SELECTOR):
+            sub.decompose()
+        plain_text = text_root.get_text(" ", strip=True)
     else:
-        full_text = base_text
+        plain_text = ""
 
-    return {
-        'review_id': rid,
-        'reviewer': reviewer.get_text(strip=True) if reviewer else '',
-        'stars': (star_el['aria-label'].strip()
-                  if star_el is not None and star_el.has_attr('aria-label')
-                  else ''),
-        'date': normalized_date,
-        'text': full_text,
+    # Full text = plain text + structured summary
+    if structured_summary:
+        full_text = f"{plain_text}\n\n{structured_summary}" if plain_text else structured_summary
+    else:
+        full_text = plain_text
+
+    # Parse structured block into fields
+    structured_block = structured_summary or ""
+    structured_fields = {}
+    patterns = {
+        "meal_type": r"Meal type:\s*(.+)",
+        "price_per_person": r"Price per person:\s*\$?(.+)",
+        "food_score": r"Food:\s*([0-9])",
+        "service_score": r"Service:\s*([0-9])",
+        "atmosphere_score": r"Atmosphere:\s*([0-9])",
+        "noise_level": r"Noise level:\s*(.+)",
+        "wait_time": r"Wait time:\s*(.+)",
+        "parking_space": r"Parking space:\s*(.+)",
+        "parking_options": r"Parking options:\s*(.+)",
+        "recommended_dishes": r"Recommended dishes?:\s*(.+)",
+        "vegetarian_options": r"Vegetarian options?:\s*(.+)",
+        "dietary_restrictions": r"Dietary restrictions?:\s*(.+)",
+        "parking_general": r"Parking:\s*(.+)",
+        "kid_friendliness": r"Kid[- ]friendliness?:\s*(.+)",
+        "wheelchair_accessibility": r"Wheelchair accessibility:\s*(.+)",
     }
+    for key, pat in patterns.items():
+        m = re.search(pat, structured_block, flags=re.IGNORECASE)
+        if not m:
+            continue
+        val = m.group(1).strip()
+        if key.endswith("_score"):
+            try:
+                structured_fields[key] = int(val)
+            except ValueError:
+                structured_fields[key] = None
+        elif key == "recommended_dishes":
+            dishes = [x.strip() for x in re.split(r"[，,;/]", val) if x.strip()]
+            structured_fields[key] = dishes
+        else:
+            structured_fields[key] = val
+
+    # Parse stars into integer if possible
+    stars_int = None
+    if star_el is not None and star_el.has_attr('aria-label'):
+        star_label = star_el['aria-label'].strip()
+        m = re.search(r"(\d+)", star_label)
+        if m:
+            try:
+                stars_int = int(m.group(1))
+            except ValueError:
+                stars_int = None
+
+    data: Dict[str, Any] = {
+        "review_id": rid,
+        "reviewer": reviewer_el.get_text(strip=True) if reviewer_el else "",
+        "stars": stars_int,
+        "date": normalized_date,
+        "raw_text": full_text,
+        "plain_text": plain_text,
+    }
+
+    # Map structured fields to flat keys
+    data.update({
+        "meal_type": structured_fields.get("meal_type"),
+        "price_per_person": structured_fields.get("price_per_person"),
+        "food": structured_fields.get("food_score"),
+        "service": structured_fields.get("service_score"),
+        "atmosphere": structured_fields.get("atmosphere_score"),
+        "noise_level": structured_fields.get("noise_level"),
+        "wait_time": structured_fields.get("wait_time"),
+        "parking": structured_fields.get("parking_general"),
+        "parking_space": structured_fields.get("parking_space"),
+        "parking_options": structured_fields.get("parking_options"),
+        "recommended_dishes": structured_fields.get("recommended_dishes"),
+        "vegetarian_options": structured_fields.get("vegetarian_options"),
+        "dietary_restrictions": structured_fields.get("dietary_restrictions"),
+        "kid_friendliness": structured_fields.get("kid_friendliness"),
+        "wheelchair_accessibility": structured_fields.get("wheelchair_accessibility"),
+    })
+
+    return data
 
 
 # ==============================
@@ -381,13 +459,13 @@ def expand_visible_more_buttons(browser):
                 )
                 try:
                     btn.click()
-                except Exception:
+                except WebDriverException:
                     browser.execute_script("arguments[0].click();", btn)
                 time.sleep(0.3)
-            except Exception:
+            except WebDriverException:
                 continue
-    except Exception:
-        pass
+    except WebDriverException as e:
+        logger.warning("⚠️ Error while expanding 'More' buttons: %s", e)
 
 
 def should_stop_due_to_old_reviews(browser, years_threshold=STOP_AT_YEARS_AGO) -> bool:
@@ -397,7 +475,7 @@ def should_stop_due_to_old_reviews(browser, years_threshold=STOP_AT_YEARS_AGO) -
     """
     try:
         nodes = browser.find_elements(By.CSS_SELECTOR, REVIEW_NODE_SELECTOR)
-    except Exception:
+    except WebDriverException:
         return False
 
     for n in nodes:
@@ -408,9 +486,9 @@ def should_stop_due_to_old_reviews(browser, years_threshold=STOP_AT_YEARS_AGO) -
                 m = re.search(r"(\d+)", txt)
                 if m and int(m.group(1)) >= years_threshold:
                     logger.info(
-                        f"⏹ Found old review with date '{txt}'; stop scrolling.")
+                        "⏹ Found old review with date '%s'; stop scrolling.", txt)
                     return True
-        except Exception:
+        except WebDriverException:
             continue
     return False
 
@@ -452,26 +530,26 @@ def scroll_reviews_to_bottom(browser, container, max_rounds=600, pause=0.9):
             nodes = browser.find_elements(
                 By.CSS_SELECTOR, REVIEW_NODE_SELECTOR)
             count = len(nodes)
-        except Exception:
+        except WebDriverException as e:
+            logger.warning("⚠️ Error while finding review nodes: %s", e)
             nodes = []
             count = last_count
 
         # Stop early if we see "2 years ago" (or more) in any review
         if should_stop_due_to_old_reviews(browser, years_threshold=STOP_AT_YEARS_AGO):
             logger.info(
-                f"🔽 Scroll round {i+1}: height={h}, reviews_loaded={count}")
+                "🔽 Scroll round %s: height=%s, reviews_loaded=%s", i+1, h, count)
             break
 
         logger.info(
-            f"🔽 Scroll round {i+1}: height={h}, reviews_loaded={count}")
+            "🔽 Scroll round %s: height=%s, reviews_loaded=%s", i+1, h, count)
 
         # Stall detection: no growth in height or count
         if h == last_height and count == last_count:
             stall += 1
             if stall >= stall_limit:
                 logger.info(
-                    "⏹ No further growth in scroll height or review count; stop scrolling."
-                )
+                    "⏹ No further growth in scroll height or review count; stop scrolling.")
                 break
         else:
             stall = 0
@@ -534,7 +612,7 @@ def scrape_reviews_for_url(raw_url: str):
 
         # After scrolling and final expansion, collect ALL visible review nodes once
         nodes = browser.find_elements(By.CSS_SELECTOR, REVIEW_NODE_SELECTOR)
-        logger.info(f"📥 Found {len(nodes)} review nodes after scrolling.")
+        logger.info("📥 Found %s review nodes after scrolling.", len(nodes))
 
         parsed = []
         seen_ids = set()
@@ -547,7 +625,7 @@ def scrape_reviews_for_url(raw_url: str):
             seen_ids.add(rid)
 
         logger.info(
-            f"✅ Parsed {len(parsed)} unique reviews from the current page view.")
+            "✅ Parsed %s unique reviews from the current page view.", len(parsed))
 
         # Extract place name for filenames
         try:
@@ -555,7 +633,7 @@ def scrape_reviews_for_url(raw_url: str):
                 EC.presence_of_element_located((By.CSS_SELECTOR, 'h1.DUwDvf'))
             )
             place_name = place_el.text.strip()
-        except Exception:
+        except WebDriverException:
             title = browser.title or "place"
             place_name = title.replace(" - Google Maps", "").strip()
 
@@ -576,20 +654,14 @@ def save_reviews(place_name: str, reviews: list[dict]):
     # JSON
     if SAVE_JSON:
         json_filename = OUTPUT_ROOT / f"{safe_name}_reviews.json"
-        with open(json_filename, "w", encoding="utf-8") as f:
-            json.dump(reviews, f, ensure_ascii=False, indent=2)
-        logger.info(f"💾 Saved reviews to {json_filename}")
+        domain = REVIEWS_CFG.get("domain", "restaurant")
+        json_payload = {
+            "source": "google_maps",
+            "place_name": safe_name,
+            "domain": domain,
+            "reviews": reviews,
+        }
+        save_json(json_filename, json_payload)
+        logger.info("💾 Saved reviews to %s", json_filename)
     else:
         logger.info("🔕 JSON saving disabled in config.")
-
-    # CSV
-    if SAVE_CSV:
-        try:
-            df = pd.DataFrame(reviews)
-            csv_filename = OUTPUT_ROOT / f"{safe_name}_reviews.csv"
-            df.to_csv(csv_filename, index=False)
-            logger.info(f"💾 Saved reviews CSV to {csv_filename}")
-        except Exception as e:
-            logger.error(f"⚠️ Failed to save CSV: {e}")
-    else:
-        logger.info("🔕 CSV saving disabled in config.")

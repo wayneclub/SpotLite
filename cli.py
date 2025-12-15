@@ -1,13 +1,15 @@
 # main CLI entry for SpotLite
 import argparse
 import logging
+from pathlib import Path
 
+from spotlite.analysis.google_maps_analyzer import GoogleMapsAnalyzer
 from spotlite.config.config import load_config
 from spotlite.config.logging_config import setup_logging
 from spotlite.crawler.google_maps.reviews import scrape_reviews_for_url, save_reviews
 from spotlite.crawler.google_maps.details import get_place_details, get_place_id, save_details
 from spotlite.analysis.keywords import analyze_keywords
-from spotlite.analysis.aspect_phrases import analyze_aspect_phrases
+from spotlite.utils.io_utils import load_json
 
 
 API_KEYS = load_config("api_keys.json")
@@ -40,15 +42,22 @@ def cmd_details(args):
 
 
 def cmd_analyze(args):
-    # 這裡先放簡單範例，之後你做 NLP 分析時可以填進來
-    input_path = args.input
-    analyze_keywords(input_path)
+    """
+    使用 GoogleMapsAnalyzer 對「未處理過的 reviews.json」做 NLP 分析，
+    根據 domain 產生 CSV (TF-IDF + aggregated targets)。
+    """
+    input_path = Path(args.input)
+    if not input_path.exists():
+        logger.error("❌ Input file does not exist: %s", input_path)
+        return
 
+    logger.info("🔍 Start analysis")
 
-# Aspect phrases subcommand handler
-def cmd_phrases(args):
-    input_path = args.input
-    analyze_aspect_phrases(input_path)
+    analyzer = GoogleMapsAnalyzer(domain=args.domain)
+
+    raw_json = load_json(input_path)   # 讀取爬取後的 JSON
+    result = analyzer.run_analysis(raw_json)
+    logger.info("✅ Analysis finished.")
 
 
 # ---------- Main CLI ----------
@@ -81,14 +90,9 @@ def build_parser():
         "analyze", help="Analyze reviews JSON (NLP, keywords, etc.)")
     p_analyze.add_argument("-i", "--input", required=True,
                            help="Path to reviews.json")
+    p_analyze.add_argument("--domain", required=True,
+                           help="Domain name (e.g. restaurant, hotel, airline)")
     p_analyze.set_defaults(func=cmd_analyze)
-
-    # phrases
-    p_phrases = subparsers.add_parser(
-        "phrases", help="Extract aspect phrases and summaries")
-    p_phrases.add_argument("-i", "--input", required=True,
-                           help="Path to reviews.json")
-    p_phrases.set_defaults(func=cmd_phrases)
 
     return parser
 
