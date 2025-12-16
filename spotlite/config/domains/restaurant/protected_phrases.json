@@ -33,6 +33,14 @@
     "tasting menu": "tasting_menu",
     "bar menu": "bar_menu",
     "kids menu": "kids_menu",
+    "lunch menu": "lunch_menu",
+    "dinner menu": "dinner_menu",
+    "brunch menu": "brunch_menu",
+    "weekend brunch": "weekend_brunch",
+    "soft shell crab": "soft_shell_crab",
+    "spicy tuna": "spicy_tuna",
+    "spicy salmon": "spicy_salmon",
+    "all you can eat": "all_you_can_eat",
     "cheap eats": "cheap_eats",
     "money well spent": "money_well_spent",
     "happy hour": "happy_hour",
@@ -109,6 +117,7 @@
     "waitlist system": "waitlist_system",
     "price point": "price_point",
     "too small portion": "too_small_portion",
+    "ice cream": "ice_cream",
     "dirty spoon": "dirty_spoon",
     "dirty fork": "dirty_fork",
     "dirty cup": "dirty_cup",
@@ -135,6 +144,8 @@
     "buffalo wings": "buffalo_wings",
     "not sure": "not_sure",
     "pro tip": "pro_tip",
-    "high end": "high_end"
+    "high end": "high_end",
+    "hand roll": "handroll",
+    "hand rolls": "handroll"
   }
 }
