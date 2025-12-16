@@ -1,5 +1,3 @@
-
-
 import re
 import time
 from datetime import datetime, timedelta
@@ -651,6 +649,17 @@ def save_reviews(place_name: str, reviews: list[dict]):
     safe_name = re.sub(r'[\\/*?:"<>|]', "_", place_name) or "place"
     OUTPUT_ROOT.mkdir(parents=True, exist_ok=True)
 
+    # Calculate unique dishes
+    unique_dishes = set()
+    for review in reviews:
+        rd = review.get("recommended_dishes")
+        if rd and isinstance(rd, list):
+            for dish in rd:
+                unique_dishes.add(dish)
+
+    # Sort for consistent output
+    dishes_list = sorted(list(unique_dishes))
+
     # JSON
     if SAVE_JSON:
         json_filename = OUTPUT_ROOT / f"{safe_name}_reviews.json"
@@ -659,6 +668,7 @@ def save_reviews(place_name: str, reviews: list[dict]):
             "source": "google_maps",
             "place_name": safe_name,
             "domain": domain,
+            "dishes": dishes_list,
             "reviews": reviews,
         }
         save_json(json_filename, json_payload)

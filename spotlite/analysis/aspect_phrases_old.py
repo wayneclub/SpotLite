@@ -1,10 +1,12 @@
 """
-Aspect Keyword Analyzer (Ultimate Edition v13 - Final Aggregation Fix)
+Aspect Keyword Analyzer (Ultimate Edition v34 - Dynamic Menu Injection)
 ------------------------------------------
-版本更新 (v13)：
-1. [CRITICAL FIX] 通用名詞雙重降級：在 normalize_noun 中，對像 'food', 'meal', 'dish' 這樣的通用名詞進行二次降級，讓它們優先被更有描述性的詞替換。
-2. [CRITICAL FIX] 聚合顯示強化：在 aggregate_group 中，強制優先選擇帶有形容詞的多詞片語 (如 delicious_appetizer)，即使單詞 'appetizer' 頻率更高。
-3. 包含所有先前版本的修正。
+版本更新 (v34) 總結：
+1. [FEATURE ADD] 自動菜單注入：在 load_data 中讀取 reviews.json 的 "dishes" 欄位。
+   - 將菜名 (如 "Spicy Beef") 自動轉為 protected phrase (spicy_beef)。
+   - 這些菜名只在記憶體中生效，不會寫入 protected_phrases.json。
+2. [AGGREGATION FIX] 菜單優先權：將自動讀取的菜名加入 FIXED_PHRASES，確保聚合時優先保留這些特定菜名，不被拆解。
+3. [RETAINED] 保留 v33 的所有語意分層和情感提取邏輯。
 """
 
 import json
@@ -67,7 +69,7 @@ def get_nlp():
 def get_aspect_model():
     global _aspect_model
     if _aspect_model is None:
-        _aspect_model = SentenceTransformer('all-MiniLM-L6-v2')
+        _aspect_model = SentenceTransformer('all-mpnet-base-v2')
     return _aspect_model
 
 # --------------------------------------------------
@@ -82,6 +84,10 @@ class AspectKeywordAnalyzer:
         self.processed_records: List[Dict] = []
         self.tfidf_df: pd.DataFrame = pd.DataFrame()
         self.input_stem = "analysis"
+        self.place_name = ""
+
+        # [NEW] 用於存儲從 JSON 動態讀取的菜名
+        self.menu_items: Set[str] = set()
 
         self.stopwords: Set[str] = set(ENGLISH_STOP_WORDS)
         self.protected_phrases: Dict[str, str] = {}
@@ -98,6 +104,7 @@ class AspectKeywordAnalyzer:
         self.sentiment_embeddings = {}
 
         self._load_domain_resources(domain)
+        self._inject_hardcoded_domain_knowledge()
         self._precompute_seed_embeddings()
 
     def _load_domain_resources(self, domain: str):
@@ -127,8 +134,7 @@ class AspectKeywordAnalyzer:
                         if raw_list is None:
                             raw_list = []
                             for v in data.values():
-                                if isinstance(v, list):
-                                    raw_list.extend(v)
+                                raw_list.extend(v)
 
                     if raw_list:
                         self.stopwords.update(to_lemma_set(raw_list))
@@ -193,6 +199,40 @@ class AspectKeywordAnalyzer:
             except Exception as e:
                 logger.error(f"Failed to load seeds: {e}")
 
+    def _inject_hardcoded_domain_knowledge(self):
+        logger.info("Injecting hardcoded domain knowledge...")
+
+        if "taste" not in self.aspect_seeds:
+            self.aspect_seeds["taste"] = []
+
+        # Hardcoded core product types
+        CORE_PRODUCTS = ["malatang", "broth", "soup base", "soup",
+                         "noodle", "ingredient", "meat", "mala tang", "hot pot"]
+        for prod in CORE_PRODUCTS:
+            if prod not in self.aspect_seeds["taste"]:
+                self.aspect_seeds["taste"].append(prod)
+
+        HARDCODED_PROTECTED = {
+            "mala tang": "malatang",
+            "soup base": "soup_base",
+            "spicy albacore": "spicy_albacore",
+            "crispy rice": "crispy_rice",
+            "hot pot": "hot_pot",
+            "wrong delivery": "wrong_delivery",
+            "wrong order": "wrong_order",
+            "missing item": "missing_item"
+        }
+        for k, v in HARDCODED_PROTECTED.items():
+            self.protected_phrases[k] = v
+            self.protected_tokens.add(v)
+
+        for prod in CORE_PRODUCTS:
+            if prod in self.stopwords:
+                self.stopwords.remove(prod)
+            composite = prod.replace(" ", "_")
+            if composite in self.stopwords:
+                self.stopwords.remove(composite)
+
     def _precompute_seed_embeddings(self):
         if not self.aspect_seeds:
             return
@@ -246,7 +286,6 @@ class AspectKeywordAnalyzer:
         phrases: List[str] = []
 
         VALID_NOUN = {"NOUN", "PROPN"}
-        # [FIX] 包含動詞分詞 VBN/VBG (e.g., seasoned, fried)
         VALID_MOD = {"ADJ", "NUM", "PROPN", "VERB"}
 
         GARBAGE = {"don", "isn", "aren", "wasn", "weren", "haven", "hasn", "hadn",
@@ -281,7 +320,7 @@ class AspectKeywordAnalyzer:
                         advs.append(lemma)
             return advs[0] if advs else ""
 
-        # Pattern 1: (NEG?) + (ADV) + ADJ + NOUN
+        # Pattern 1
         for i in range(len(doc)):
             token = doc[i]
             if token.text.lower() in entity_blacklist:
@@ -308,7 +347,6 @@ class AspectKeywordAnalyzer:
                         break
 
                     if curr.pos_ != "AUX":
-                        # 檢查動詞分詞標籤，確保是修飾語
                         if curr.pos_ == "VERB" and curr.tag_ not in ("VBN", "VBG"):
                             break
 
@@ -327,7 +365,7 @@ class AspectKeywordAnalyzer:
                     else:
                         phrases.append(phrase_body)
 
-        # Pattern 2: NOUN + be + (ADV) + ADJ/VBN/VBG
+        # Pattern 2
         for token in doc:
             if token.pos_ == "ADJ" or (token.pos_ == "VERB" and token.tag_ in ("VBN", "VBG")):
                 adj = token.lemma_.lower()
@@ -370,7 +408,7 @@ class AspectKeywordAnalyzer:
                 pre_adv, post_attr, noun_target = "", "", ""
                 is_neg = False
                 for c in token.children:
-                    if c.dep_ == "neg" or c.lemma_ in {"never", "not"}:
+                    if c.dep_ == "neg" or c.lemma_.lower() in {"never", "no", "not"}:
                         is_neg = True
                     elif c.dep_ == "advmod" and c.pos_ == "ADV" and c.i < token.i:
                         lemma = c.lemma_.lower()
@@ -400,10 +438,9 @@ class AspectKeywordAnalyzer:
                     phrases.append("_".join(parts))
 
         # Pattern 4
-        CRITICAL_HYGIENE = {"gloves", "glove",
-                            "mask", "masks", "hand", "hands"}
-        for i in range(len(doc)):
-            token = doc[i]
+        for token in doc:
+            CRITICAL_HYGIENE = {"gloves", "glove",
+                                "mask", "masks", "hand", "hands"}
             if token.text.lower() in CRITICAL_HYGIENE:
                 phrase_parts = []
                 head = token.head
@@ -438,8 +475,6 @@ class AspectKeywordAnalyzer:
 
         for ph in phrases:
             ph_low = ph.lower().strip()
-
-            # 疊字去重 (love_love -> love)
             ph_low = re.sub(r'\b(\w+)(?:_\1)+\b', r'\1', ph_low)
 
             if ph_low in seen:
@@ -468,11 +503,9 @@ class AspectKeywordAnalyzer:
             parts_lemma.append(p_lem)
         text_lemma = "_".join(parts_lemma)
 
-        # [FIX] 0. 獨立情感詞過濾
         if len(parts_lemma) == 1 and parts_lemma[0] in self.global_sentiment_terms:
             return None
 
-        # 1. Stopwords 過濾
         if text_lemma in self.stopwords:
             return None
 
@@ -481,18 +514,22 @@ class AspectKeywordAnalyzer:
             "broken", "chipped", "cracked",
             "no", "missing", "lack", "ask", "need",
             "michelin", "texas", "nashville",
-            "without", "change", "wear"
+            "without", "change", "wear",
         }
 
+        is_generic_stopword_found = False
         for part in parts_lemma:
             if part in self.stopwords:
-                if not any(t in text_lower for t in KEEP_TRIGGERS):
-                    return None
+                if not any(part in trigger for trigger in KEEP_TRIGGERS):
+                    is_generic_stopword_found = True
+                    break
 
-        # 2. 強勢形容詞優先
+        if is_generic_stopword_found:
+            return None
+
         PRIORITY_MAP = {
             "price": ["affordable", "cheap", "expensive", "price", "cost", "bill", "value", "worth", "overpriced", "pricy", "reasonable", "rip-off", "check", "dollar", "buck", "money"],
-            "waiting_time": ["wait", "queue", "line", "slow", "fast", "rush", "forever", "minute", "hour", "long time"],
+            "waiting_time": ["wait", "queue", "line", "slow", "fast", "rush", "forever", "long time"],
             "service": ["rude", "friendly", "polite", "helpful", "staff", "waiter", "waitress", "manager", "server", "host", "hostess", "glove", "mask", "hygiene"]
         }
         for aspect, keywords in PRIORITY_MAP.items():
@@ -501,13 +538,11 @@ class AspectKeywordAnalyzer:
                     continue
                 return aspect
 
-        # 3. 種子詞精確匹配 (含 keywords)
         for aspect, seeds in self.aspect_seeds.items():
             for seed in seeds:
                 if len(seed) > 2 and seed in text_lemma:
                     return aspect
 
-        # 4. 核心名詞 AI 比對
         model = get_aspect_model()
         head_word = parts_lemma[-1]
 
@@ -525,7 +560,6 @@ class AspectKeywordAnalyzer:
             if max_head_score >= 0.35:
                 return best_head_aspect
 
-        # 5. 整句 AI 比對
         v_full = model.encode(text.replace("_", " "), convert_to_tensor=True)
         best_aspect, max_score = None, -1.0
 
@@ -554,7 +588,6 @@ class AspectKeywordAnalyzer:
                             for t in nlp(w)]) for w in raw_neg])
         ALL_NEG_ADJS = set(self.global_neg_seeds).union(neg_lemma_set)
 
-        # 否定詞反轉邏輯
         if any(k in parts for k in {"not", "no", "never", "didn", "don", "wont", "cant", "without"}):
             head_lemma = nlp(head)[0].lemma_.lower()
 
@@ -562,8 +595,7 @@ class AspectKeywordAnalyzer:
                 return "pos"
             return "neg"
 
-        TIME_UNITS = {"hour", "minute", "hr", "min",
-                      "forever", "eternity", "age", "long"}
+        TIME_UNITS = {"forever", "eternity", "age", "long"}
         if ("spend" in parts or "spent" in parts) and any(unit in text_lower for unit in TIME_UNITS):
             return "neg"
         if "limited" in parts:
@@ -599,16 +631,84 @@ class AspectKeywordAnalyzer:
         return None
 
     def load_data(self, input_path: str | Path) -> 'AspectKeywordAnalyzer':
-        input_path = Path(input_path)
+        if not isinstance(input_path, Path):
+            try:
+                input_path = Path(input_path)
+            except Exception as e:
+                logger.error(
+                    f"Failed to convert input_path to Path object: {e}")
+                raise TypeError(
+                    f"Invalid input_path format: Must be str or Path.")
+
         if not input_path.exists():
             raise FileNotFoundError(input_path)
+
         self.input_stem = input_path.stem.replace("_reviews", "")
         with open(input_path, "r", encoding="utf-8") as f:
             raw_data = json.load(f)
+
+        self.place_name = raw_data.get(
+            "place_name") or raw_data.get("name") or ""
         self.raw_records = raw_data.get(
             "reviews") or raw_data.get("data") or raw_data
+
         logger.info(f"Loaded {len(self.raw_records)} reviews.")
+
+        # [NEW] 讀取並注入菜名
+        self._inject_menu_items(raw_data)
+
+        self._dynamic_stopword_update()
         return self
+
+    def _inject_menu_items(self, raw_data: Dict):
+        """
+        [NEW] 從 JSON 讀取 dishes，並注入到保護名單
+        """
+        dishes = raw_data.get("dishes", [])
+        if not dishes:
+            return
+
+        logger.info(
+            f"Found {len(dishes)} menu items. Injecting into protection list.")
+        for dish in dishes:
+            clean_key = str(dish).lower().strip()
+            # 轉換為標準格式 (spicy beef -> spicy_beef)
+            clean_val = clean_key.replace(" ", "_")
+
+            # 1. 加入 Protected Phrases (提取時不拆解)
+            self.protected_phrases[clean_key] = clean_val
+            self.protected_tokens.add(clean_val)
+
+            # 2. 加入 Class 級別變數 (聚合時不拆解)
+            self.menu_items.add(clean_val)
+
+            # 3. 確保不被 Stopwords 過濾
+            if clean_key in self.stopwords:
+                self.stopwords.remove(clean_key)
+            if clean_val in self.stopwords:
+                self.stopwords.remove(clean_val)
+
+    def _dynamic_stopword_update(self):
+        if not self.place_name:
+            return
+
+        logger.info(f"Dynamically processing store name: {self.place_name}")
+        nlp = get_nlp()
+
+        known_products = set(self.aspect_seeds.get('taste', []))
+        if isinstance(self.aspect_seeds_raw.get('taste'), dict):
+            keywords = self.aspect_seeds_raw['taste'].get('keywords', [])
+            known_products.update(keywords)
+
+        doc = nlp(self.place_name)
+        for token in doc:
+            word = token.text.lower()
+            if word not in known_products and len(word) > 1:
+                self.stopwords.add(word)
+                logger.info(f"  -> Added '{word}' to dynamic stopwords.")
+            else:
+                logger.info(
+                    f"  -> Kept '{word}' (recognized as product/keyword).")
 
     def extract_phrases(self) -> 'AspectKeywordAnalyzer':
         if not self.raw_records:
@@ -616,7 +716,8 @@ class AspectKeywordAnalyzer:
         logger.info("Extracting phrases...")
         processed = []
         for item in self.raw_records:
-            text = (item.get("text") or item.get("plain_text") or "")
+            text = (item.get("text") or item.get(
+                "plain_text") or item.get("raw_text") or "")
             if not text or not str(text).strip():
                 continue
             text_lower = str(text).lower()
@@ -687,18 +788,30 @@ class AspectKeywordAnalyzer:
         FIXED_PHRASES = {
             'soft_shell_crab', 'blue_crab', 'king_crab', 'snow_crab',
             'spicy_tuna', 'spicy_salmon', 'handroll', 'crispy_rice',
-            'happy_hour', 'tasting_menu', 'omakase', 'baked_crab', 'unagi_shrimp_tempura'
+            'happy_hour', 'tasting_menu', 'omakase', 'baked_crab', 'unagi_shrimp_tempura',
+            'spicy_albacore', 'malatang', 'broth', 'hot_pot', 'soup_base',
+            'wrong_delivery', 'wrong_order', 'missing_item'
         }
+
+        # [NEW] 將動態讀取的菜名加入 FIXED_PHRASES
+        FIXED_PHRASES.update(self.menu_items)
 
         GENERIC_HEADS = {
             'place', 'spot', 'location', 'area', 'restaurant', 'shop', 'store',
             'joint', 'thing', 'way', 'option', 'choice', 'selection', 'experience',
-            'dish', 'item', 'one', 'bit', 'love', 'like'
+            'dish', 'item', 'one', 'bit', 'love', 'like',
+            'apology', 'time'
         }
 
-        # [NEW FIX] 額外的通用名詞集合 (用於降級 Head Noun)
         SECONDARY_GENERIC_HEADS = {
             'food', 'meal', 'cuisine', 'appetizer', 'entree', 'dessert', 'snack'}
+
+        SENTIMENT_ADJECTIVES = {
+            'good', 'great', 'bad', 'nice', 'excellent', 'amazing', 'wonderful',
+            'terrible', 'awful', 'horrible', 'best', 'worst', 'delicious', 'tasty',
+            'yummy', 'fantastic', 'perfect', 'ok', 'okay', 'decent', 'fine', 'authentic',
+            'fresh', 'super', 'highly'
+        }
 
         SYNONYM_MAP = {
             'hour': 'time', 'minute': 'time', 'min': 'time', 'hr': 'time',
@@ -716,7 +829,6 @@ class AspectKeywordAnalyzer:
         def normalize_noun(phrase):
             parts = phrase.split('_')
 
-            # [FIX] Step 0: 專門矯正動詞片語/固定名詞的 Head Noun
             is_action_phrase = len(
                 parts) >= 2 and parts[-2] in {'change', 'wash', 'wear'}
             is_hygiene_noun = parts[-1] in {'glove', 'mask'}
@@ -726,43 +838,66 @@ class AspectKeywordAnalyzer:
                     return "_".join(parts[1:])
                 return "_".join(parts)
 
-            # Step 1: 絕對豁免檢查
             if phrase in FIXED_PHRASES:
                 return phrase
+
+            if len(parts) > 2 and 'crispy_rice' in FIXED_PHRASES:
+                if phrase.endswith('crispy_rice') and ('albacore' in phrase or 'tuna' in phrase):
+                    return 'crispy_rice'
 
             for fixed in FIXED_PHRASES:
                 if phrase.endswith(f"_{fixed}"):
                     return fixed
 
-            # Step 2: 略過通用結尾 (e.g. recommend_place -> recommend)
             if len(parts) > 1 and parts[-1] in GENERIC_HEADS:
                 raw_noun = parts[-2]
             else:
                 raw_noun = parts[-1]
 
-            # [CRITICAL FIX] Step 3: 通用名詞雙重降級
-            if raw_noun in SECONDARY_GENERIC_HEADS and len(parts) > 1 and parts[0] not in SECONDARY_GENERIC_HEADS:
-                # 如果 Head Noun 是通用詞，且前面有修飾語（如 delicious），則將 Head Noun 設為修飾詞 (delicious_appetizer -> delicious)
-                # 但我們不能返回形容詞，所以我們返回 '修飾語+名詞' 的完整片語來確保它獨立成群
-                return phrase  # 返回完整片語，阻止其與單詞 'appetizer' 歸併
+            clean_parts = []
+            for p in parts[:-1]:
+                if p not in SENTIMENT_ADJECTIVES:
+                    clean_parts.append(p)
+            clean_parts.append(parts[-1])
 
-            # Step 4: 同義詞與原形歸併
+            potential_head = "_".join(clean_parts)
+
+            if len(clean_parts) > 0:
+                raw_noun = potential_head
+            else:
+                raw_noun = parts[-1]
+
+            if raw_noun in {'food', 'meal', 'dish', 'cuisine'}:
+                if len(parts) == 1 or parts[0] in self.global_sentiment_terms or parts[0] in SENTIMENT_ADJECTIVES:
+                    return 'generic_food'
+
+            if raw_noun in {'time', 'minute', 'hour', 'second', 'day', 'week', 'month', 'year'}:
+                return 'generic_time'
+
+            if "_" in raw_noun:
+                return raw_noun
+
+            if raw_noun in SECONDARY_GENERIC_HEADS:
+                return raw_noun
+
             if raw_noun in SYNONYM_MAP:
                 return SYNONYM_MAP[raw_noun]
 
-            lemma = nlp(raw_noun)[0].lemma_.lower()
+            lemma = nlp(raw_noun.split('_')[-1])[0].lemma_.lower()
             if lemma in SYNONYM_MAP:
                 return SYNONYM_MAP[lemma]
 
-            if lemma == raw_noun.lower() and lemma.endswith('s') and not lemma.endswith('ss'):
+            if lemma == raw_noun.split('_')[-1].lower() and lemma.endswith('s') and not lemma.endswith('ss'):
                 singular = lemma[:-1]
                 if singular in SYNONYM_MAP:
                     return SYNONYM_MAP[singular]
                 return singular
 
-            return lemma
+            return raw_noun
 
         df['head_noun'] = df['phrase'].apply(normalize_noun)
+
+        df = df[~df['head_noun'].isin(['generic_food', 'generic_time'])].copy()
 
         def aggregate_group(group):
             total_tfidf = group['tfidf_sum'].sum()
@@ -771,42 +906,20 @@ class AspectKeywordAnalyzer:
             candidates = group.sort_values(
                 by=['freq', 'tfidf_sum'], ascending=False)
 
-            # [CRITICAL FIX] 優先級 1: 檢查是否有帶有形容詞的長片語
-            # 必須包含形容詞/副詞，且不是單詞
-            descriptive_phrases = candidates[
-                (candidates['phrase'].str.contains('_')) &
-                (~candidates['phrase'].apply(lambda x: x in FIXED_PHRASES)) &
-                (~candidates['phrase'].apply(
-                    lambda x: x in SECONDARY_GENERIC_HEADS))
-            ].sort_values(by=['freq', 'tfidf_sum'], ascending=False)
+            sentiment_phrases = candidates[candidates['phrase'].apply(
+                lambda x: any(w in SENTIMENT_ADJECTIVES for w in x.split('_'))
+            )]
 
-            if not descriptive_phrases.empty:
-                best_phrase = descriptive_phrases.iloc[0]['phrase']
-                return pd.Series({
-                    'tfidf_sum': total_tfidf,
-                    'freq': total_freq,
-                    'phrase': best_phrase
-                })
-
-            # 優先級 2: 否則，套用 v10 的邏輯 (處理單位詞)
-            CRITICAL_TERMS = {'without', 'change', 'wash', 'dirty',
-                              'same', 'no', 'not', 'expensive', 'overpriced', 'too'}
-            UNDESIRABLE_ENDINGS = {'time', 'minute', 'hour',
-                                   'day', 'week', 'month', 'year', 'second'}
-
-            semantic_phrases = candidates[candidates['phrase'].apply(
-                lambda x: any(t in x.split('_') for t in CRITICAL_TERMS))]
-
-            if not semantic_phrases.empty:
-                best_phrase = semantic_phrases.iloc[0]['phrase']
+            if not sentiment_phrases.empty:
+                best_phrase = sentiment_phrases.iloc[0]['phrase']
             else:
-                desirable_phrases = candidates[
-                    (~candidates['phrase'].apply(
-                        lambda x: x.split('_')[-1] in UNDESIRABLE_ENDINGS))
+                descriptive_phrases = candidates[
+                    (candidates['phrase'].str.contains('_')) &
+                    (~candidates['phrase'].apply(lambda x: x in FIXED_PHRASES))
                 ].sort_values(by=['freq', 'tfidf_sum'], ascending=False)
 
-                if not desirable_phrases.empty:
-                    best_phrase = desirable_phrases.iloc[0]['phrase']
+                if not descriptive_phrases.empty:
+                    best_phrase = descriptive_phrases.iloc[0]['phrase']
                 else:
                     best_phrase = candidates.iloc[0]['phrase']
 
@@ -825,7 +938,8 @@ class AspectKeywordAnalyzer:
 
         aggregated = aggregated.reset_index()
 
-        filtered_df = aggregated[aggregated['freq'] > 1]
+        filtered_df = aggregated[aggregated['freq'] > 1].copy()
+
         if filtered_df.empty and not aggregated.empty:
             filtered_df = aggregated
 
