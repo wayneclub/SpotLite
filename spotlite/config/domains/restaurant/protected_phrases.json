@@ -54,12 +54,15 @@
     "live music": "live_music",
     "outdoor seating": "outdoor_seating",
     "dim lighting": "dim_lighting",
+    "dim sum": "dim_sum",
     "great view": "great_view",
     "loud music": "loud_music",
     "wait time": "wait_time",
     "long line": "long_line",
     "long wait": "long_wait",
-    "mala tang": "mala_tang",
+    "hot pot": "hotpot",
+    "mala tang": "malatang",
+    "late night": "late_night",
     "soup base": "soup_base",
     "pork belly": "pork_belly",
     "beef noodle": "beef_noodle",
@@ -138,6 +141,9 @@
     "dirty cup": "dirty_cup",
     "no spoon": "no_spoon",
     "missing spoon": "missing_spoon",
+    "wrong delivery": "wrong_delivery",
+    "missing item": "missing_item",
+    "blueberry matcha": "blueberry_matcha",
     "chipped glass": "chipped_glass",
     "broken chair": "broken_chair",
     "sticky table": "sticky_table",
@@ -162,6 +168,8 @@
     "pro tip": "pro_tip",
     "high end": "high_end",
     "hand roll": "handroll",
-    "hand rolls": "handroll"
+    "hand rolls": "handroll",
+    "carrot cake": "carrot_cake",
+    "chicken_sandwich": "chicken_sandwich"
   }
 }

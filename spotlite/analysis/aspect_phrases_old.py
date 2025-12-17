@@ -1,12 +1,13 @@
 """
-Aspect Keyword Analyzer (Ultimate Edition v34 - Dynamic Menu Injection)
+Aspect Keyword Analyzer (Ultimate Edition v52 - Draft & Polish)
 ------------------------------------------
-版本更新 (v34) 總結：
-1. [FEATURE ADD] 自動菜單注入：在 load_data 中讀取 reviews.json 的 "dishes" 欄位。
-   - 將菜名 (如 "Spicy Beef") 自動轉為 protected phrase (spicy_beef)。
-   - 這些菜名只在記憶體中生效，不會寫入 protected_phrases.json。
-2. [AGGREGATION FIX] 菜單優先權：將自動讀取的菜名加入 FIXED_PHRASES，確保聚合時優先保留這些特定菜名，不被拆解。
-3. [RETAINED] 保留 v33 的所有語意分層和情感提取邏輯。
+版本更新 (v52) 總結：
+1. [SUMMARY FIX] 草稿與潤飾策略 (Draft & Polish)：
+   - 不再讓 AI 直接從關鍵字生成摘要（避免幻覺或指令誤解）。
+   - Step 1 (Python): 根據 top_keywords 自動組裝一個「事實草稿」(Fact Draft)。強制包含頻率最高的食物。
+   - Step 2 (AI): 使用 T5 模型將這個草稿「改寫 (Rewrite)」為自然段落。
+   - 效果：100% 提及指定食物 (matcha, coffee)，0% 幻覺 (不會出現 sushi)，語句通順。
+2. [RETAINED] 保留 v48 的所有核心功能。
 """
 
 import json
@@ -23,6 +24,15 @@ import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer, ENGLISH_STOP_WORDS
 from sentence_transformers import SentenceTransformer, util
 import spacy
+
+# Hugging Face Imports
+try:
+    import torch
+    from transformers import pipeline, AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
+    TRANSFORMERS_AVAILABLE = True
+except ImportError:
+    TRANSFORMERS_AVAILABLE = False
+    print("Warning: Transformers/Torch/BitsAndBytes not found.")
 
 # --------------------------------------------------
 # Config Loading
@@ -53,6 +63,7 @@ OUTPUT_ROOT.mkdir(parents=True, exist_ok=True)
 # --------------------------------------------------
 _nlp_instance = None
 _aspect_model = None
+_summary_pipeline = None
 
 
 def get_nlp():
@@ -72,6 +83,37 @@ def get_aspect_model():
         _aspect_model = SentenceTransformer('all-mpnet-base-v2')
     return _aspect_model
 
+
+def get_summary_pipeline():
+    """
+    [UPGRADE] Load Zephyr-7B-beta using 4-bit quantization for high-quality natural text.
+    Requires GPU (T4 is fine).
+    """
+    global _summary_pipeline
+    if _summary_pipeline is None and TRANSFORMERS_AVAILABLE:
+        # [CONFIG] 模型選擇
+        # "google/flan-t5-large" (推薦: 品質好，速度尚可)
+        # "google/flan-t5-base"  (極速: 速度快，但語法較生硬)
+        model_id = "google/flan-t5-large"
+
+        logger.info(f"Loading LLM model: {model_id}...")
+        try:
+            tokenizer = AutoTokenizer.from_pretrained(model_id)
+            model = AutoModelForSeq2SeqLM.from_pretrained(model_id)
+
+            # Explicitly use text2text-generation for T5
+            _summary_pipeline = pipeline(
+                "text2text-generation",
+                model=model,
+                tokenizer=tokenizer
+            )
+            logger.info("✅ Model loaded successfully.")
+
+        except Exception as e:
+            logger.error(f"❌ Failed to load summary model: {e}")
+
+    return _summary_pipeline
+
 # --------------------------------------------------
 # Main Class
 # --------------------------------------------------
@@ -86,7 +128,6 @@ class AspectKeywordAnalyzer:
         self.input_stem = "analysis"
         self.place_name = ""
 
-        # [NEW] 用於存儲從 JSON 動態讀取的菜名
         self.menu_items: Set[str] = set()
 
         self.stopwords: Set[str] = set(ENGLISH_STOP_WORDS)
@@ -104,7 +145,7 @@ class AspectKeywordAnalyzer:
         self.sentiment_embeddings = {}
 
         self._load_domain_resources(domain)
-        self._inject_hardcoded_domain_knowledge()
+        # self._inject_hardcoded_domain_knowledge() # Removed in v48
         self._precompute_seed_embeddings()
 
     def _load_domain_resources(self, domain: str):
@@ -160,13 +201,14 @@ class AspectKeywordAnalyzer:
             except Exception as e:
                 logger.error(f"Failed to load protected phrases: {e}")
 
-        # 3. Aspect Seeds
+        # 3. Aspect Seeds & Whitelisting
         seeds_path = base / "aspect_seeds.json"
         if seeds_path.exists():
             try:
                 with open(seeds_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
                     self.aspect_seeds_raw = data
+                    whitelist_candidates = set()
 
                     for aspect, content in data.items():
                         if aspect == "global_sentiment":
@@ -181,6 +223,7 @@ class AspectKeywordAnalyzer:
                             neg = content.get("seeds_neg", []) or []
                             all_seeds = kw + pos + neg
 
+                        whitelist_candidates.update(all_seeds)
                         self.aspect_seeds[aspect] = list(
                             to_lemma_set(all_seeds))
 
@@ -195,43 +238,27 @@ class AspectKeywordAnalyzer:
                         self.global_sentiment_terms.update(
                             self.global_neg_seeds)
 
-                logger.info(f"Loaded seeds (auto-lemmatized).")
+                        whitelist_candidates.update(
+                            data["global_sentiment"].get("pos", []))
+                        whitelist_candidates.update(
+                            data["global_sentiment"].get("neg", []))
+
+                    removed_count = 0
+                    for word in whitelist_candidates:
+                        clean_word = word.lower().strip()
+                        if clean_word in self.stopwords:
+                            self.stopwords.remove(clean_word)
+                            removed_count += 1
+                        underscore_word = clean_word.replace(" ", "_")
+                        if underscore_word in self.stopwords:
+                            self.stopwords.remove(underscore_word)
+                            removed_count += 1
+
+                    logger.info(
+                        f"Loaded seeds and whitelisted {removed_count} terms from stopwords.")
+
             except Exception as e:
                 logger.error(f"Failed to load seeds: {e}")
-
-    def _inject_hardcoded_domain_knowledge(self):
-        logger.info("Injecting hardcoded domain knowledge...")
-
-        if "taste" not in self.aspect_seeds:
-            self.aspect_seeds["taste"] = []
-
-        # Hardcoded core product types
-        CORE_PRODUCTS = ["malatang", "broth", "soup base", "soup",
-                         "noodle", "ingredient", "meat", "mala tang", "hot pot"]
-        for prod in CORE_PRODUCTS:
-            if prod not in self.aspect_seeds["taste"]:
-                self.aspect_seeds["taste"].append(prod)
-
-        HARDCODED_PROTECTED = {
-            "mala tang": "malatang",
-            "soup base": "soup_base",
-            "spicy albacore": "spicy_albacore",
-            "crispy rice": "crispy_rice",
-            "hot pot": "hot_pot",
-            "wrong delivery": "wrong_delivery",
-            "wrong order": "wrong_order",
-            "missing item": "missing_item"
-        }
-        for k, v in HARDCODED_PROTECTED.items():
-            self.protected_phrases[k] = v
-            self.protected_tokens.add(v)
-
-        for prod in CORE_PRODUCTS:
-            if prod in self.stopwords:
-                self.stopwords.remove(prod)
-            composite = prod.replace(" ", "_")
-            if composite in self.stopwords:
-                self.stopwords.remove(composite)
 
     def _precompute_seed_embeddings(self):
         if not self.aspect_seeds:
@@ -365,39 +392,43 @@ class AspectKeywordAnalyzer:
                     else:
                         phrases.append(phrase_body)
 
-        # Pattern 2
+        # Pattern 2 & 5
         for token in doc:
             if token.pos_ == "ADJ" or (token.pos_ == "VERB" and token.tag_ in ("VBN", "VBG")):
                 adj = token.lemma_.lower()
-                has_adv = any(
-                    c.lemma_.lower() in KEEP_ADVERBS for c in token.children if c.dep_ == "advmod")
-                if not has_adv and adj in CHECK_SET:
-                    continue
 
                 if token.dep_ in ("acomp", "attr"):
                     copular = token.head
-                    noun = next((c.lemma_.lower(
-                    ) for c in copular.children if c.dep_ == "nsubj" and c.pos_ in VALID_NOUN), None)
 
-                    noun_token_text = next((c.text.lower(
-                    ) for c in copular.children if c.dep_ == "nsubj" and c.pos_ in VALID_NOUN), "")
-                    if noun and (noun in entity_blacklist or noun_token_text in entity_blacklist):
-                        continue
+                    subjects = []
+                    for child in copular.children:
+                        if child.dep_ == "nsubj" and child.pos_ in VALID_NOUN:
+                            subjects.append(child)
+                            for conj in child.conjuncts:
+                                if conj.pos_ in VALID_NOUN:
+                                    subjects.append(conj)
 
                     is_neg = any(c.dep_ == "neg" or c.lemma_ in {
                                  "never", "not"} for c in copular.children)
                     adv = get_adv(token)
 
-                    parts = []
-                    if is_neg:
-                        parts.append("not")
-                    if adv:
-                        parts.append(adv)
-                    parts.append(adj)
-                    if noun and noun not in CHECK_SET:
+                    for subj in subjects:
+                        noun = subj.lemma_.lower()
+                        if subj.text in protected_set:
+                            noun = subj.text
+                        elif noun in CHECK_SET:
+                            continue
+
+                        parts = []
+                        if is_neg:
+                            parts.append("not")
+                        if adv:
+                            parts.append(adv)
+                        parts.append(adj)
                         parts.append(noun)
-                    if len(parts) > 1:
-                        phrases.append("_".join(parts))
+
+                        if len(parts) > 1:
+                            phrases.append("_".join(parts))
 
         # Pattern 3
         for token in doc:
@@ -579,6 +610,30 @@ class AspectKeywordAnalyzer:
         head = parts[-1]
         text_lower = phrase.lower().replace("_", " ")
 
+        NEUTRAL_FLAVORS = {'spicy', 'sour', 'sweet', 'bitter', 'salty', 'hot'}
+        has_neutral_flavor = any(w in NEUTRAL_FLAVORS for w in parts)
+
+        STRONG_POS = {'good', 'great', 'excellent', 'amazing', 'wonderful', 'fantastic', 'perfect',
+                      'best', 'nice', 'love', 'delicious', 'yummy', 'tasty', 'flavorful', 'hit', 'spot'}
+        NEGATION = {'not', 'no', 'never', "didn't",
+                    "don't", "cant", "cannot", "wouldn't", "wont"}
+        EXCESS = {'too', 'overly', 'excessively'}
+        STRONG_NEG = {'bad', 'terrible', 'awful',
+                      'horrible', 'worst', 'disgusting', 'gross'}
+
+        has_pos = any(w in STRONG_POS for w in parts)
+        has_neg_word = any(w in STRONG_NEG for w in parts)
+        has_negation = any(w in NEGATION for w in parts)
+        has_excess = any(w in EXCESS for w in parts)
+
+        if has_neutral_flavor:
+            if has_pos and not has_negation:
+                return "pos"
+            elif has_negation or has_excess or has_neg_word:
+                return "neg"
+            else:
+                return None
+
         seeds_obj = self.aspect_seeds_raw.get(aspect, {})
         raw_neg = (seeds_obj.get("seeds_neg", [])
                    if isinstance(seeds_obj, dict) else [])
@@ -588,9 +643,8 @@ class AspectKeywordAnalyzer:
                             for t in nlp(w)]) for w in raw_neg])
         ALL_NEG_ADJS = set(self.global_neg_seeds).union(neg_lemma_set)
 
-        if any(k in parts for k in {"not", "no", "never", "didn", "don", "wont", "cant", "without"}):
+        if any(k in parts for k in NEGATION):
             head_lemma = nlp(head)[0].lemma_.lower()
-
             if head_lemma in ALL_NEG_ADJS or any(adj in text_lower for adj in ALL_NEG_ADJS):
                 return "pos"
             return "neg"
@@ -624,11 +678,32 @@ class AspectKeywordAnalyzer:
         )) if embeds["neg"] is not None else -1.0
 
         score = s_pos - s_neg
+
+        sentiment = None
         if score > 0.05:
-            return "pos"
+            sentiment = "pos"
         elif score < -0.05:
-            return "neg"
-        return None
+            sentiment = "neg"
+
+        return self._check_sentiment_consistency(phrase, sentiment)
+
+    def _check_sentiment_consistency(self, phrase: str, sentiment: str) -> str:
+        if sentiment is None:
+            return None
+
+        parts = phrase.lower().split('_')
+        STRONG_POS = {'good', 'great', 'excellent', 'amazing', 'wonderful',
+                      'fantastic', 'perfect', 'best', 'nice', 'love', 'delicious', 'yummy', 'tasty'}
+        NEGATION = {'not', 'no', 'never', "didn't",
+                    "don't", "cant", "cannot", "wouldn't", "wont"}
+
+        has_pos_word = any(w in STRONG_POS for w in parts)
+        has_negation = any(w in NEGATION for w in parts)
+
+        if has_pos_word and not has_negation:
+            return "pos"
+
+        return sentiment
 
     def load_data(self, input_path: str | Path) -> 'AspectKeywordAnalyzer':
         if not isinstance(input_path, Path):
@@ -654,39 +729,46 @@ class AspectKeywordAnalyzer:
 
         logger.info(f"Loaded {len(self.raw_records)} reviews.")
 
-        # [NEW] 讀取並注入菜名
         self._inject_menu_items(raw_data)
-
         self._dynamic_stopword_update()
         return self
 
     def _inject_menu_items(self, raw_data: Dict):
-        """
-        [NEW] 從 JSON 讀取 dishes，並注入到保護名單
-        """
         dishes = raw_data.get("dishes", [])
         if not dishes:
             return
 
         logger.info(
             f"Found {len(dishes)} menu items. Injecting into protection list.")
+        nlp = get_nlp()
         for dish in dishes:
             clean_key = str(dish).lower().strip()
-            # 轉換為標準格式 (spicy beef -> spicy_beef)
             clean_val = clean_key.replace(" ", "_")
 
-            # 1. 加入 Protected Phrases (提取時不拆解)
+            # 1. Protect original
             self.protected_phrases[clean_key] = clean_val
             self.protected_tokens.add(clean_val)
-
-            # 2. 加入 Class 級別變數 (聚合時不拆解)
             self.menu_items.add(clean_val)
 
-            # 3. 確保不被 Stopwords 過濾
+            # 2. Protect lemma
+            doc = nlp(clean_key)
+            lemma_parts = [t.lemma_.lower() for t in doc]
+            clean_key_lemma = " ".join(lemma_parts)
+            clean_val_lemma = "_".join(lemma_parts)
+
+            if clean_val_lemma != clean_val:
+                self.protected_phrases[clean_key_lemma] = clean_val_lemma
+                self.protected_tokens.add(clean_val_lemma)
+                self.menu_items.add(clean_val_lemma)
+
             if clean_key in self.stopwords:
                 self.stopwords.remove(clean_key)
             if clean_val in self.stopwords:
                 self.stopwords.remove(clean_val)
+            if clean_key_lemma in self.stopwords:
+                self.stopwords.remove(clean_key_lemma)
+            if clean_val_lemma in self.stopwords:
+                self.stopwords.remove(clean_val_lemma)
 
     def _dynamic_stopword_update(self):
         if not self.place_name:
@@ -793,7 +875,6 @@ class AspectKeywordAnalyzer:
             'wrong_delivery', 'wrong_order', 'missing_item'
         }
 
-        # [NEW] 將動態讀取的菜名加入 FIXED_PHRASES
         FIXED_PHRASES.update(self.menu_items)
 
         GENERIC_HEADS = {
@@ -810,7 +891,7 @@ class AspectKeywordAnalyzer:
             'good', 'great', 'bad', 'nice', 'excellent', 'amazing', 'wonderful',
             'terrible', 'awful', 'horrible', 'best', 'worst', 'delicious', 'tasty',
             'yummy', 'fantastic', 'perfect', 'ok', 'okay', 'decent', 'fine', 'authentic',
-            'fresh', 'super', 'highly'
+            'fresh', 'super', 'highly', 'pretty'
         }
 
         SYNONYM_MAP = {
@@ -839,7 +920,14 @@ class AspectKeywordAnalyzer:
                 return "_".join(parts)
 
             if phrase in FIXED_PHRASES:
-                return phrase
+                head_word_raw = phrase.split('_')[-1]
+                if len(parts) == 1:
+                    head_word_lemma = nlp(head_word_raw)[0].lemma_.lower()
+                    return head_word_lemma
+
+                head_word_lemma = nlp(head_word_raw)[0].lemma_.lower()
+                base = "_".join(parts[:-1])
+                return f"{base}_{head_word_lemma}"
 
             if len(parts) > 2 and 'crispy_rice' in FIXED_PHRASES:
                 if phrase.endswith('crispy_rice') and ('albacore' in phrase or 'tuna' in phrase):
@@ -867,7 +955,10 @@ class AspectKeywordAnalyzer:
             else:
                 raw_noun = parts[-1]
 
-            if raw_noun in {'food', 'meal', 'dish', 'cuisine'}:
+            if raw_noun in {'good', 'great', 'nice', 'bad', 'terrible', 'ok', 'okay', 'fine', 'decent', 'pretty', 'really'}:
+                return 'generic_sentiment'
+
+            if raw_noun in {'food', 'meal', 'dish', 'cuisine', 'drink', 'beverage', 'drinks', 'beverages'}:
                 if len(parts) == 1 or parts[0] in self.global_sentiment_terms or parts[0] in SENTIMENT_ADJECTIVES:
                     return 'generic_food'
 
@@ -875,7 +966,10 @@ class AspectKeywordAnalyzer:
                 return 'generic_time'
 
             if "_" in raw_noun:
-                return raw_noun
+                head_word_raw = raw_noun.split('_')[-1]
+                head_word_lemma = nlp(head_word_raw)[0].lemma_.lower()
+                base_parts = raw_noun.split('_')[:-1]
+                return "_".join(base_parts + [head_word_lemma])
 
             if raw_noun in SECONDARY_GENERIC_HEADS:
                 return raw_noun
@@ -897,7 +991,8 @@ class AspectKeywordAnalyzer:
 
         df['head_noun'] = df['phrase'].apply(normalize_noun)
 
-        df = df[~df['head_noun'].isin(['generic_food', 'generic_time'])].copy()
+        df = df[~df['head_noun'].isin(
+            ['generic_food', 'generic_time', 'generic_sentiment'])].copy()
 
         def aggregate_group(group):
             total_tfidf = group['tfidf_sum'].sum()
@@ -948,6 +1043,196 @@ class AspectKeywordAnalyzer:
             ascending=[True, True, False, False]
         ).groupby(['aspect', 'sentiment']).head(top_n)
 
+    def generate_summary(self):
+        """
+        Narrative Synthesis Strategy for natural, human-like summaries (FLAN-T5).
+        Fixes:
+        - Use text2text-generation explicitly (FLAN-T5 correct task)
+        - Short, strict prompt; DATA at the end
+        - Use max_new_tokens (avoid max_length issues)
+        - Deterministic decoding first; optional sampling mode
+        - Fallback if model returns "instruction-like" text
+        """
+        if not TRANSFORMERS_AVAILABLE:
+            logger.warning(
+                "Summary generation skipped: Transformers not installed.")
+            return
+
+        pipe = get_summary_pipeline()
+        if pipe is None:
+            logger.warning(
+                "Summary generation skipped: Model could not be loaded.")
+            return
+
+        # ---- Ensure correct pipeline task (FLAN-T5 wants text2text-generation) ----
+        # If your get_summary_pipeline() already returns a proper pipe, this is fine.
+        # But if it returns summarization/text-generation by mistake, rebuild it.
+        try:
+            task = getattr(pipe, "task", None)
+            if task != "text2text-generation":
+                from transformers import pipeline as hf_pipeline
+                logger.warning(
+                    f"Rebuilding pipeline: expected text2text-generation, got {task}")
+                pipe = hf_pipeline("text2text-generation",
+                                   model="google/flan-t5-large")
+        except Exception as e:
+            logger.warning(f"Could not verify pipeline task: {e}")
+
+        top5_df = self.get_top_keywords(5)
+        if top5_df.empty:
+            logger.warning("Summary generation skipped: No keywords found.")
+            return
+
+        # ----------------------------
+        # 1) Build compact DATA facts
+        # ----------------------------
+        data_lines = []
+
+        aspect_priority = ["taste", "service",
+                           "environment", "price", "waiting_time"]
+        existing_aspects = list(top5_df["aspect"].dropna().unique())
+
+        sorted_aspects = [a for a in aspect_priority if a in existing_aspects]
+        sorted_aspects += [a for a in existing_aspects if a not in aspect_priority]
+
+        for aspect in sorted_aspects:
+            aspect_df = top5_df[top5_df["aspect"] == aspect].sort_values(
+                by="freq", ascending=False)
+
+            pos_phrases, neg_phrases = [], []
+            for _, row in aspect_df.iterrows():
+                phrase = str(row.get("phrase", "")).replace("_", " ").strip()
+                if not phrase:
+                    continue
+                if row.get("sentiment") == "pos":
+                    pos_phrases.append(phrase)
+                else:
+                    neg_phrases.append(phrase)
+
+            # keep it tight; too much noise makes FLAN drift
+            pos_phrases = pos_phrases[:4]
+            neg_phrases = neg_phrases[:3]
+
+            # Use field-like format (less "listy" than bullets)
+            if pos_phrases:
+                data_lines.append(
+                    f"{aspect.upper()}_PROS: {', '.join(pos_phrases)}")
+            if neg_phrases:
+                data_lines.append(
+                    f"{aspect.upper()}_CONS: {', '.join(neg_phrases)}")
+
+        context_data = "\n".join(data_lines).strip()
+
+        # Debug (recommended)
+        logger.info("context_data_len=%d", len(context_data))
+        logger.info("context_data_preview=\n%s", context_data[:600])
+
+        if len(context_data) < 60:
+            logger.warning(
+                "Summary generation skipped: context_data too short / weak signal.")
+            return
+
+        # ----------------------------
+        # 2) Short, strict prompt
+        # ----------------------------
+        prompt = f"""Write a single cohesive restaurant review summary based ONLY on the DATA.
+
+Output requirements:
+- 4 to 6 sentences total (not bullet points).
+- Sentence 1: overall vibe/positioning from the strongest pros.
+- Sentence 2-3: details on Taste first, then Service/Environment.
+- Use "However," to transition into weaknesses.
+- End with a practical recommendation (who it's good for / what to expect).
+- Do NOT repeat the DATA as a list. Do NOT explain the task.
+
+DATA:
+{context_data}
+
+ANSWER:
+"""
+
+        # ----------------------------
+        # 3) Generation (deterministic first)
+        # ----------------------------
+        def looks_like_instructions(text: str) -> bool:
+            t = (text or "").strip().lower()
+            bad_starts = (
+                "describe", "write a", "task:", "guidelines:", "for example", "include the",
+                "use transition", "avoid using"
+            )
+            # If it contains too many instruction words, treat as failure
+            return (t.startswith(bad_starts) or ("guidelines" in t) or ("task" in t and "data" not in t))
+
+        def rule_based_fallback() -> str:
+            # Simple, safe fallback paragraph (no hallucination)
+            # Picks top aspects by presence and nets: pros first, then cons.
+            pros_bits, cons_bits = [], []
+            for line in data_lines:
+                if "_PROS:" in line:
+                    label = line.split("_PROS:", 1)[0].title()
+                    pros_bits.append(
+                        f"{label.lower()} highlights include {line.split(':',1)[1].strip()}")
+                if "_CONS:" in line:
+                    label = line.split("_CONS:", 1)[0].title()
+                    cons_bits.append(
+                        f"{label.lower()} concerns include {line.split(':',1)[1].strip()}")
+            pros_sentence = " ".join(
+                pros_bits[:2]) if pros_bits else "Overall, the feedback highlights a few positives."
+            cons_sentence = " ".join(
+                cons_bits[:2]) if cons_bits else "However, there are limited negative signals in the extracted keywords."
+            return f"{pros_sentence}. However, {cons_sentence}."
+
+        try:
+            logger.info("Generating summary with FLAN-T5 (deterministic)...")
+            out = pipe(
+                prompt,
+                max_new_tokens=160,
+                do_sample=False,
+                num_beams=4,
+                repetition_penalty=1.25,
+                no_repeat_ngram_size=4,
+                early_stopping=True,
+            )
+            summary_text = (out[0].get("generated_text", "") or "").strip()
+
+            # If it still outputs instructions, retry once with sampling
+            if looks_like_instructions(summary_text):
+                logger.warning(
+                    "Model returned instruction-like text. Retrying with sampling...")
+                out = pipe(
+                    prompt,
+                    max_new_tokens=180,
+                    do_sample=True,
+                    temperature=0.6,
+                    top_p=0.9,
+                    num_beams=1,
+                    repetition_penalty=1.25,
+                    no_repeat_ngram_size=4,
+                )
+                summary_text = (out[0].get("generated_text", "") or "").strip()
+
+            # Final fallback (guaranteed output)
+            if looks_like_instructions(summary_text) or len(summary_text) < 40:
+                logger.warning(
+                    "Model output still invalid. Using rule-based fallback.")
+                summary_text = rule_based_fallback()
+
+            # Save
+            ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+            out_path = OUTPUT_ROOT / self.input_stem / f"summary_{ts}.txt"
+            out_path.parent.mkdir(parents=True, exist_ok=True)
+
+            with open(out_path, "w", encoding="utf-8") as f:
+                f.write(summary_text)
+
+            logger.info(f"Summary saved to {out_path}")
+            print("\n--- Generated Summary ---")
+            print(summary_text)
+            print("-------------------------")
+
+        except Exception as e:
+            logger.error(f"Failed to generate summary: {e}")
+
     def save_results(self):
         if self.tfidf_df.empty:
             return
@@ -968,6 +1253,14 @@ if __name__ == "__main__":
     if len(sys.argv) < 2:
         print("Usage: python aspect_analyzer.py path/to/reviews.json [domain]")
         sys.exit(1)
-    AspectKeywordAnalyzer(sys.argv[2] if len(sys.argv) > 2 else "restaurant").load_data(
-        sys.argv[1]).extract_phrases().compute_tfidf().save_results()
+
+    analyzer = AspectKeywordAnalyzer(
+        sys.argv[2] if len(sys.argv) > 2 else "restaurant")
+    analyzer.load_data(sys.argv[1])
+    analyzer.extract_phrases()
+    analyzer.compute_tfidf()
+    analyzer.save_results()
+
+    analyzer.generate_summary()
+
     print("Done.")

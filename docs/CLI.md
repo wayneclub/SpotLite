@@ -1,10 +1,21 @@
+Here is the updated `CLI.md` tailored to the new Python code provided.
+
+Major changes include:
+
+1. **Configuration**: Added instructions for `api_keys.json`.
+2. **Workflow Split**: The single `analyze` command has been replaced by a two-phase workflow: `kewords` (Analysis) and `summary` (LLM Generation).
+3. **New Arguments**: Added documentation for `--domain` in the keyword analysis phase.
+
+---
+
 # SpotLite CLI Guide
 
 The SpotLite CLI provides a unified interface to:
 
-- Scrape **Google Maps reviews** using Selenium
-- Fetch **place details** via the Google Places API
-- Run **NLP keyword analysis** on scraped review data
+* Scrape **Google Maps reviews** using Selenium
+* Fetch **place details** via the Google Places API
+* Run **Phase 1: Keyword & Sentiment Analysis** (NLP)
+* Run **Phase 2: AI Summary Generation** (LLM)
 
 All commands are run from the project root.
 
@@ -13,32 +24,36 @@ All commands are run from the project root.
 # 1. Installation
 
 ## Python Version
+
 SpotLite supports:
 
-- **Python 3.11+** (recommended)
+* **Python 3.11+** (recommended)
 
 ## Install Dependencies
 
 ```bash
-python -m venv venv
-source venv/bin/activate       # Windows: venv\Scripts\activate
 pip install -r requirements.txt
+
 ```
 
 ## Setup Configuration
 
-```bash
-cp configs.example.json configs.json
-```
+SpotLite now uses split configuration files.
 
-Update your Google API key:
+* **API Keys** (`api_keys.json`):
 
-```jsonc
-"google_maps": {
-  "api_key": "YOUR_API_KEY",
-  "timeout_seconds": 20
+Create `api_keys.json` in the project root for credentials:
+```json
+{
+  "google_maps": {
+    "api_key": "YOUR_GOOGLE_MAPS_API_KEY",
+    "timeout_seconds": 20
+  }
 }
+
 ```
+
+
 
 ---
 
@@ -48,16 +63,18 @@ Run CLI:
 
 ```bash
 python cli.py <command> [options]
+
 ```
 
 Available commands:
 
-| Command   | Description |
-|-----------|-------------|
-| `reviews` | Scrape Google Maps reviews |
-| `details` | Fetch Google Maps place details |
-| `analyze` | Run NLP keyword analysis on reviews JSON |
-| `-d` / `--debug` | Enable debug logs + file logging |
+| Command | Phase | Description |
+| --- | --- | --- |
+| `reviews` | Scraper | Scrape Google Maps reviews |
+| `details` | Scraper | Fetch Google Maps place details |
+| `kewords` | Analysis (Phase 1) | Extract keywords, calculate TF-IDF, output CSV |
+| `summary` | Analysis (Phase 2) | Generate LLM summaries from analyzed JSON |
+| `-d` / `--debug` | Global | Enable debug logs + file logging |
 
 ---
 
@@ -69,122 +86,118 @@ Scrape reviews for a single Google Maps place URL using Selenium.
 
 ```bash
 python cli.py reviews -u "<google_maps_url>" [-d]
+
 ```
 
 ## Options
 
 | Option | Description |
-|--------|-------------|
+| --- | --- |
 | `-u`, `--url` | **Required**. Google Maps place link. |
 | `-d`, `--debug` | Enable debug logging + save logs to file. |
 
-## Features
-
-- Automatically expands short links (`maps.app.goo.gl`, `goo.gl/maps`)
-- Forces English UI in Selenium
-- Automatically clicks:
-  - **Sort → Newest**
-  - Every **See more** button
-- Smart scrolling logic:
-  - Stops at configured limits
-  - Stops when encountering reviews older than `stop_at_years_ago` (e.g., `2 years ago`)
-
 ## Output
 
-Configured in:
+Saves to `data/reviews/`:
 
-```jsonc
-"reviews": {
-  "output_root": "data/reviews",
-  "stop_at_years_ago": 2,
-  "save_json": true,
-  "save_csv": true
-}
-```
-
-Saves:
-
-- `<place_name>_reviews.json`
-- `<place_name>_reviews.csv`
+* `<place_name>_reviews.json`
+* `<place_name>_reviews.csv`
 
 ---
 
 # 4. Command: `details`
 
-Fetch structured place details via Google Places API.
+Fetch structured place details via Google Places API. Requires `api_keys.json` to be configured.
 
 ## Usage
 
 ```bash
 python cli.py details -u "<google_maps_url>" [-d]
+
 ```
 
 ## Behavior
 
-- Resolves short links if needed
-- Extracts `place_id` or `text_query`
-- Requests details via Google Maps Places API
-- Saves pretty-formatted JSON
+* Extracts `place_id` from the URL.
+* Queries Google Places API using the key in `api_keys.json`.
+* Saves structured JSON.
 
-## Output Config
-
-```jsonc
-"details": {
-  "output_root": "data/details",
-  "save_json": true
-}
-```
+## Output
 
 Typical output:
 
 ```
 data/details/<place_id>.json
+
 ```
 
 ---
 
-# 5. Command: `analyze`
+# 5. Command: `kewords` (Phase 1)
 
-Run NLP keyword extraction / clustering analysis.
+**Note:** The command is strictly `kewords` (as defined in the code), aimed at "Keywords Extraction".
+
+This command performs **Phase 1** of the analysis pipeline:
+
+1. Loads raw review JSON.
+2. Extracts phrases and sentiment using `AspectKeywordAnalyzer`.
+3. Computes TF-IDF statistics.
+4. Outputs CSV reports.
 
 ## Usage
 
 ```bash
-python cli.py analyze -i path/to/reviews.json [-d]
+python cli.py kewords -i <path_to_reviews.json> [--domain <domain>] [-d]
+
 ```
 
 ## Options
 
 | Option | Description |
-|--------|-------------|
-| `-i`, `--input` | Path to a reviews JSON file |
-| `-d`, `--debug` | Enable debug logging |
+| --- | --- |
+| `-i`, `--input` | **Required**. Path to the raw `reviews.json` file. |
+| `--domain` | Domain context for NLP (default: `restaurant`). |
+| `-d`, `--debug` | Enable debug logging. |
 
-## Behavior
+## Output
 
-- Loads JSON
-- Runs analysis (`spotlite.analysis.keywords`)
-- Saves output under `outputs/` or as configured
+Generates analysis files in the same directory or `outputs/` (depending on configuration), typically including:
+
+* Keyword statistics (CSV)
+* Sentiment analysis results
 
 ---
 
-# 6. Logging System
+# 6. Command: `summary` (Phase 2)
 
-Logging is controlled by `configs.json`:
+This command performs **Phase 2** of the analysis pipeline:
 
-```jsonc
-"logging": {
-  "level": "INFO",
-  "console": true,
-  "save_to_file": false,
-  "file_path": "logs/app.log"
-}
+1. Loads the analyzed data (JSON format).
+2. Passes data to the LLM module (`generate_review_summary`).
+3. Generates a natural language summary.
+
+## Usage
+
+```bash
+python cli.py summary -i <path_to_analyzed_data.json> [-d]
+
 ```
 
-When you pass `-d` / `--debug`:
+## Options
 
-- Logging level switches to **DEBUG**
-- Logs are always written to file (even if config says false)
+| Option | Description |
+| --- | --- |
+| `-i`, `--input` | **Required**. Path to the JSON file containing top5_keyword.json data. |
+| `-d`, `--debug` | Enable debug logging. |
+
+---
+
+# 7. Logging System
+
+Logging is controlled by `configs.json` and the `-d` flag.
+
+* **Default**: Level INFO, logs to console.
+* **Debug Mode (`-d`)**: Level DEBUG, logs to file (defaults to `logs/app.log`).
 
 To log inside modules:
 
@@ -193,53 +206,36 @@ import logging
 logger = logging.getLogger(__name__)
 
 logger.info("Scraping started")
-logger.debug("Raw HTML length = %d", len(html))
+
 ```
 
 ---
 
-# 7. Examples
+# 8. Examples
 
-## Scrape reviews
+## Full Workflow Example
+
+**1. Scrape Reviews**
+
 ```bash
-python cli.py reviews -u "https://maps.app.goo.gl/EXAMPLE"
+python cli.py reviews -u "https://goo.gl/maps/example"
+
 ```
 
-## Scrape reviews with debug logs
+**2. Analyze Keywords (Phase 1)**
+
 ```bash
-python cli.py reviews -u "https://maps.app.goo.gl/EXAMPLE" -d
+python cli.py kewords -i data/reviews/MyPlace_reviews.json --domain restaurant
+
 ```
 
-## Fetch place details
+**3. Generate AI Summary (Phase 2)**
+
 ```bash
-python cli.py details -u "https://maps.app.goo.gl/EXAMPLE"
+# Assuming Phase 1 generated a specific JSON output
+python cli.py summary -i outputs/MyPlace_top5_keywords.json
+
 ```
-
-## Analyze review JSON
-```bash
-python cli.py analyze -i data/reviews/SomePlace_reviews.json
-```
-
----
-
-# 8. Future CLI Extensions
-
-Planned:
-
-- Batch scraping:
-  ```bash
-  python cli.py reviews-batch -i places.csv
-  ```
-- Write results to database:
-  ```bash
-  python cli.py sync-db -i data/reviews/*.json
-  ```
-- AI summary generation:
-  ```bash
-  python cli.py summarize -i <reviews.json>
-  ```
-
-The CLI is intentionally thin—heavy logic remains inside the `spotlite` Python package for maximum maintainability.
 
 ---
 
